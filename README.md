@@ -1,7 +1,7 @@
 # BSOL Outcomes Framework <img src="https://www.birminghamsolihull.icb.nhs.uk/application/files/1316/5651/5354/logo_full_colour_main_lockup.svg" align="right" width="300px"/>
 
 <!-- badges: start -->
-[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
+[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/experimental.svg)](https://www.repostatus.org/#experimental)
 <!-- badges: end -->
 
 This git repository holds the code for our ICS' first collaborative coding effort to bring our Population Health Outcomes Framework together.
