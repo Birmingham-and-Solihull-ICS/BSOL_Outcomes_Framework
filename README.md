@@ -30,7 +30,7 @@ Folder for R files.  Each indicator will, at minimum, have an insert statement t
 Please name files as follows, replacing spaces with underscores, in lower case:  IndicatorID_IndicatorName
 e.g. 0_example_indicator
 
-## docs
+### docs
 Any associated documentation that is required to be shared can be added here.  In general, avoid adding to this unless necessary, as the meta data will take care of definitions.
 
 ## Database structure
@@ -43,7 +43,7 @@ Proposed data structure can be viewed here:  https://lucid.app/lucidchart/d9cd8f
 
 This repository is for SQL, R and other associated code to building the indicators, but it is not intended to publish data or contain any data.  By following that workflow, no data will be exposed.
 
-*By contributing to this project, you are taking responsibility for not uploading any data to GitHub*
+**By contributing to this project, you are taking responsibility for not uploading any data to GitHub**
 
 To help with this, the project is contains a `.gitignore` file.  This file contains file/folder/file extensions that Git will ignore by default.  If you need to import one of these files, you can do so, but you will need to use the `force` command to do so.
 
@@ -51,4 +51,5 @@ To help with this, the project is contains a `.gitignore` file.  This file conta
 
 
 
-This repository is dual licensed under the [Open Government v3]([https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/) & MIT. All code can outputs are subject to Crown Copyright.
+
+**This repository is dual licensed under the [Open Government v3]([https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/) & MIT. All code can outputs are subject to Crown Copyright.**
