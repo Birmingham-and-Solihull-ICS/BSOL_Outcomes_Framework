@@ -8,7 +8,7 @@
 
 ## Packages to install
 
-c_cran_packages <- c("tidyverse","remotes", "DBI", "odbc")
+c_cran_packages <- c("tidyverse","remotes", "DBI", "odbc", "httr", "jsonlite")
 c_github_packages <- c("rOpenSci/fingertipsR")
 
 
