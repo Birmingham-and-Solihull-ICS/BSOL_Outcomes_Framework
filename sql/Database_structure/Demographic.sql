@@ -13,6 +13,8 @@ GO
 CREATE TABLE [OF].[Demographic]
 	(
 	DemographicID smallint NOT NULL IDENTITY (1, 1),
+	DemographicType nvarchar(30),
+	DemographicCode nvarchar(20),
 	DemographicLabel nvarchar(500)
 	)  ON [PRIMARY]
 GO
@@ -27,3 +29,5 @@ GO
 ALTER TABLE [OF].[Demographic] SET (LOCK_ESCALATION = TABLE)
 GO
 COMMIT
+
+
