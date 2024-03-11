@@ -7,7 +7,7 @@
 .quarto
 
 # Exclude the following directories 
-
+/data/
 
 # Exclude data file types
 *.doc
@@ -18,3 +18,5 @@
 *.xlsb
 *.csv
 *.pdf
+*.rds
+*.Rdata
