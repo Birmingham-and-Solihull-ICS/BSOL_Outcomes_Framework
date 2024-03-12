@@ -15,7 +15,7 @@ CREATE TABLE [OF].[IndicatorMetadata]
 	MetaID int NOT NULL IDENTITY (1, 1),
 	IndicatorID int NOT NULL,
 	ItemID smallint NOT NULL,
-	MetaValue nvarchar(2500) NOT NULL
+	MetaValue nvarchar(1000) NOT NULL
 	)  ON [PRIMARY]
 GO
 
