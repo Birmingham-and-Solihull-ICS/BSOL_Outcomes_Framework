@@ -1,4 +1,12 @@
-# Major ODS and LA typ orgs from fingertips.
+################################################################################
+## Date: 05/03/2024
+## Overview: Populating geographical and PCN data using Fingertips
+## Author: Chris Mainey, BSOL ICB
+## Description: Looking up al possible geographies that mention Birmingham and Solihull
+##              , such as England, ICB, LA, PCN types from Fingertips.
+##               Manual addition of PCNs as correct at the time, reconciled to Fingertips
+################################################################################# 
+
 
 library(fingertipsR)
 
@@ -70,7 +78,7 @@ PCN_matching <-
   distinct()
 
 
-# Table fields are AggregationID(auto), AgggregationType, AggregationCode, AggregationLable
+# Table fields are AggregationID(auto), AggregationType, AggregationCode, AggregationLable
 
 out <- geogs %>% 
   filter(AreaType != "PCNs (v. 27/10/23)") %>% 
@@ -85,4 +93,4 @@ out <- geogs %>%
   )
 
 
-write.csv(out, file = "./data/aggregation.csv")
+write.csv(out, file = "./data/aggregation.csv", )
