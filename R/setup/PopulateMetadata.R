@@ -54,10 +54,18 @@ sql2 <- "Select * from [OF].[MetadataItems]"
 
 md_items_server <- dbGetQuery(con, sql2) 
 
+# Join on to table, and add this to the 
 IndicatorMetadata <-
   md_piv %>% 
   inner_join(md_items_server, by=c("name"="ItemLabel")) %>% 
   select(IndicatorID, ItemID, MetaValue = value)
-  
+
+ 
+# Write the table back
+# We have to use ID function to explain the schema 'OF' to dbWriteTable, else it
+# writes to 'dbo', the default schema.  
 out_tbl_metadata <- Id("OF","IndicatorMetadata")  
 DBI::dbWriteTable(con, out_tbl_metadata, IndicatorMetadata, append = TRUE)
+
+
+
