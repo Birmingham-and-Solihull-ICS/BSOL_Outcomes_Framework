@@ -10,22 +10,20 @@ SET ANSI_WARNINGS ON
 COMMIT
 BEGIN TRANSACTION
 GO
-CREATE TABLE [OF].[Aggregation]
+CREATE TABLE [OF].[IndicatorDomains]
 	(
-	[AggregationID] [smallint] IDENTITY(1,1) NOT NULL,
-	[AggregationType] [nvarchar](50),
-	[AggregationCode] [nvarchar](20),
-	[AggregationLabel] [nvarchar](500) NULL
+	DomainID smallint NOT NULL IDENTITY (1, 1),
+	DomainLabel nvarchar(500) NOT NULL
 	)  ON [PRIMARY]
 GO
 
-ALTER TABLE [OF].[Aggregation] ADD CONSTRAINT
-	PK_Aggregation_1 PRIMARY KEY CLUSTERED 
+ALTER TABLE [OF].[IndicatorDomainst] ADD CONSTRAINT
+	PK_IndicatorDomains_1 PRIMARY KEY CLUSTERED 
 	(
-	AggregationID
+	DomainID
 	) WITH( STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 
 GO
-ALTER TABLE [OF].[Aggregation] SET (LOCK_ESCALATION = TABLE)
+ALTER TABLE [OF].[IndicatorDomains] SET (LOCK_ESCALATION = TABLE)
 GO
 COMMIT

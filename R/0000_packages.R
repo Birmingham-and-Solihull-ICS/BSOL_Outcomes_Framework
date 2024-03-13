@@ -8,7 +8,9 @@
 
 ## Packages to install
 
-c_cran_packages <- c("tidyverse","remotes", "DBI", "odbc", "httr", "jsonlite")
+c_cran_packages <- c("tidyverse","remotes", "DBI", "odbc", "httr", "jsonlite"
+                     , 'DT', 'miniUI', 'shiny', 'shinycssloaders' # Dependencies for Fingertips
+                     )
 c_github_packages <- c("rOpenSci/fingertipsR")
 
 

@@ -13,7 +13,9 @@ GO
 CREATE TABLE [OF].[IndicatorList]
 	(
 	IndicatorID int NOT NULL IDENTITY (1, 1),
-	ReferenceID int NOT NULL,
+	DomainID smallint NULL,
+	ReferenceID nvarchar(50) NULL,
+	ICBIndicatorTitle nvarchar(500) NOT NULL,
 	IndicatorLabel nvarchar(500) NOT NULL,
 	StatusID smallint NOT NULL
 	)  ON [PRIMARY]
@@ -29,6 +31,3 @@ GO
 ALTER TABLE [OF].[IndicatorList] SET (LOCK_ESCALATION = TABLE)
 GO
 COMMIT
-
-
-

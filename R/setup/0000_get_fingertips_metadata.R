@@ -13,3 +13,18 @@ res$status_code
 res$content
 
 dt$`253`
+
+
+pluck_result <- function(req) {
+  req |>
+    httr2::req_perform() |>
+    httr2::resp_body_json() |>
+    purrr::pluck("result")
+}
+
+
+pluck_result(dt)
+
+b<- unlist(dt, use.names = TRUE, recursive = FALSE)
+
+library(fingertipsR)
