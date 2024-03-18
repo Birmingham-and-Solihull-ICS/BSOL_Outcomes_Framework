@@ -18,6 +18,8 @@ CREATE TABLE [OF].[IndicatorValue]
 	Numerator decimal(18, 12) NULL,
 	Denominator decimal(18, 12) NULL,
 	IndicatorValue decimal(18, 12) NOT NULL,
+	LowerCI95 decimal(18, 12) NOT NULL,
+	UpperCI95 decimal(18, 12) NOT NULL,
 	AggregationID smallint NOT NULL,
 	DemographicID smallint NOT NULL,
 	DataQualityID smallint NOT NULL,
