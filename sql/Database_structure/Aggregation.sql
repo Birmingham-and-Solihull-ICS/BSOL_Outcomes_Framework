@@ -17,6 +17,7 @@ CREATE TABLE [OF].[Aggregation]
 	[AggregationCode] [nvarchar](20),
 	[AggregationLabel] [nvarchar](500) NULL,
 	[FTPAreaType] [int] NULL
+	-- added a comment
 	)  ON [PRIMARY]
 GO
 
