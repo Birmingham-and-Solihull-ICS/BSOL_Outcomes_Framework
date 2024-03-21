@@ -9,15 +9,28 @@
 
 
 library(fingertipsR)
+library(DBI)
+
+
+
+con <- dbConnect(odbc::odbc()
+                 , .connection_string = "Driver={SQL Server};server=MLCSU-BI-SQL;database=EAT_Reporting_BSOL"
+                 , timeout = 10)
+
+
+sql_ind_lkp <- "SELECT ReferenceID from [OF].[IndicatorList]"
+                      
+ftp_inds<- dbGetQuery(con, sql_ind_lkp)[[1]] 
+
 
 # Download fill indicators table - I know it's big, but easiest way to make sure I've got all permutations
 dt <- fingertips_data(IndicatorID = ftp_inds, AreaTypeID = "All")
 
 # Save down as serialised data - Maybe we should just do this once and reuse?
-saveRDS(dt, "./data./big_indicator_file.RDS")
+saveRDS(dt, "./data/big_indicator_file.RDS")
 
 # Load the RDS file up
-dt <- readRDS("./data./big_indicator_file.RDS")
+dt <- readRDS("./data/big_indicator_file.RDS")
 
 
 # Possible BSOL geographies, unique with name Birmingham or Solihull
@@ -26,6 +39,15 @@ geogs <- unique(dt[grepl("Birmingham|Solihull|England", dt$AreaName, ignore.case
                     ]
                 )
 
+# Add ftps area type for querying
+at <- area_types() 
+
+at <- at %>% 
+  distinct(AreaTypeID, AreaTypeName)
+
+geogs <-
+  geogs %>% 
+  left_join(at, by = c("AreaCode"="AreaTypeID"))
 
 # PCN - this is a weirder one, data sourced from BSOL/MLCSU
 PCN_BSOL <-
@@ -83,14 +105,14 @@ PCN_matching <-
 out <- geogs %>% 
   filter(AreaType != "PCNs (v. 27/10/23)") %>% 
   select(AreaType, AreaCode, AreaName) %>% 
-  mutate(AreaCode = case_when(
-                      AreaCode == "nE38000258" ~ "E38000258",
-                      AreaCode == "nE54000055" ~ "E54000055",
-                      .default = AreaCode
-                      )) %>% 
+  # mutate(AreaCode = case_when(
+  #                     AreaCode == "nE38000258" ~ "E38000258",
+  #                     AreaCode == "nE54000055" ~ "E54000055",
+  #                     .default = AreaCode
+  #                     )) %>% 
   union_all(
     bind_cols(AreaType="PCNs (v. 27/10/23)", select(PCN_BSOL, AreaCode, AreaName))
   )
 
 
-write.csv(out, file = "./data/aggregation.csv", )
+write.csv(out, file = "./data/aggregation.csv")
