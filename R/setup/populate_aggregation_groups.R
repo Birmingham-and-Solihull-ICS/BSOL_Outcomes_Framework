@@ -9,6 +9,7 @@
 
 
 library(fingertipsR)
+library(tidyverse)
 library(DBI)
 
 
@@ -47,7 +48,7 @@ at <- at %>%
 
 geogs <-
   geogs %>% 
-  left_join(at, by = c("AreaCode"="AreaTypeID"))
+  left_join(at, by = c("AreaCode"="AreaCode"))
 
 # PCN - this is a weirder one, data sourced from BSOL/MLCSU
 PCN_BSOL <-
