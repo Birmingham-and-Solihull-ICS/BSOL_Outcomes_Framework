@@ -1,8 +1,9 @@
-IndicatorID = 23				
+IndicatorID = 23 
 # DomainID =	3	
 # ReferenceID = 92254 (Actually 91819 since GP prescribed only)
 # ICBIndicatorTitle = Increase uptake of Long-acting reversible contraception	
 # IndicatorLabel Total prescribed LARC excluding injections rate / 1,000
+# (Birmingham GP data only)
 
 library(dplyr)
 library(tidyr)
