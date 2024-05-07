@@ -1,9 +1,9 @@
 ################################################################################
 ## Date: 26/03/2024
-## Overview: Master downloader script, as it's easire to donwload and cut that hit API
+## Overview: Master downloader script, as it's easier to donwload and cut that hit API
 ## too many times due to confusing area Type ID, inconsistent naming etc.
 ## Author: Chris Mainey, BSOL ICB
-## Description: This sript downloads the finger tips data and loads it wholesale 
+## Description: This script downloads the finger tips data and loads it wholesale 
 ## into the database for use by all.
 ################################################################################# 
 
