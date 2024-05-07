@@ -9,6 +9,7 @@
 
 
 library(fingertipsR)
+library(tidyverse)
 library(DBI)
 
 
@@ -39,6 +40,8 @@ geogs <- unique(dt[grepl("Birmingham|Solihull|England", dt$AreaName, ignore.case
                     ]
                 )
 
+
+
 # Add ftps area type for querying
 at <- area_types() 
 
@@ -47,7 +50,11 @@ at <- at %>%
 
 geogs <-
   geogs %>% 
-  left_join(at, by = c("AreaCode"="AreaTypeID"))
+  left_join(at, by = c("AreaCode"="AreaCode"))
+
+
+
+
 
 # PCN - this is a weirder one, data sourced from BSOL/MLCSU
 PCN_BSOL <-
@@ -91,10 +98,14 @@ PCN_BSOL <-
   )
 
 
+# Pull MSOAs in
+
+sql_msoa <- dbGetQuery(con, "Select * FROM [EAT_Reporting_BSOL].[Reference].[MSOA_2021_BSOL_Codes]")
+
 library(dplyr)
 
 PCN_matching <-
-  dt3 %>% 
+  dt%>% 
   select(AreaCode, AreaName, AreaType, ParentCode, ParentName) %>% 
   right_join(PCN_BSOL, by = c("AreaCode" = "AreaCode")) %>% 
   distinct()
@@ -113,6 +124,10 @@ out <- geogs %>%
   union_all(
     bind_cols(AreaType="PCNs (v. 27/10/23)", select(PCN_BSOL, AreaCode, AreaName))
   )
+
+# Update the fingertips area_id
+
+at
 
 
 write.csv(out, file = "./data/aggregation.csv")

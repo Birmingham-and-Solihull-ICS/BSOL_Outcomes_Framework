@@ -15,8 +15,7 @@ CREATE TABLE [OF].[Aggregation]
 	[AggregationID] [smallint] IDENTITY(1,1) NOT NULL,
 	[AggregationType] [nvarchar](50),
 	[AggregationCode] [nvarchar](20),
-	[AggregationLabel] [nvarchar](500) NULL,
-	[FTPAreaType] [int] NULL
+	[AggregationLabel] [nvarchar](500) NULL
 	)  ON [PRIMARY]
 GO
 
