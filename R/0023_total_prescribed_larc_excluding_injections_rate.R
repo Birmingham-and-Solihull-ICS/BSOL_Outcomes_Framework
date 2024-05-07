@@ -19,8 +19,10 @@ file_info <- data.frame(
   quarter = c("Qtr1 23-24", "Qtr2 23-24", "Qtr3 23-24"),
   location = c("23-24/FP10 Folder/Qtr 1/", "23-24/FP10 Folder/Qtr 2/",
                "23-24/FP10 Folder/Qtr 3/"),
-  IndicatorStartDate = c("01/04/2023", "01/07/2023", "01/10/2023"),
-  IndicatorEndDate = c("31/06/2023", "30/09/2023", "31/01/2024")
+  IndicatorStartDate = as.Date(c("01/04/2023", "01/07/2023", "01/10/2023"), 
+                               format = "%d/%m/%Y"),
+  IndicatorEndDate = as.Date(c("30/06/2023", "30/09/2023", "31/01/2024"), 
+                               format = "%d/%m/%Y")
 )
 
 # Prepare empty dataframe to append data to
@@ -161,10 +163,9 @@ LARC_PCN <- LARC_GP %>%
   )%>%
   group_by(PCN) %>%
   slice_min(order_by=dist, n=1) %>%
-  ungroup() %>%
-  select(
-    c("Numerator", "Denominator", "IndicatorValue", "AggregationID",
-      "IndicatorStartDate","IndicatorEndDate")
+  ungroup() %>% select(
+    c("Numerator", "Denominator", "IndicatorValue",
+      "AggregationID", "IndicatorStartDate","IndicatorEndDate")
   )
 
 # Group by Locality
@@ -194,14 +195,12 @@ LARC_Locality <- LARC_GP %>%
     OF_aggs %>%
       filter(AggregationType=="Locality"), 
     by = c("Locality" = "AggregationLabel"),
-  ) %>%
-  select(
-    c("Numerator", "Denominator", "IndicatorValue", "AggregationID",
-      "IndicatorStartDate","IndicatorEndDate")
+  ) %>% select(
+    c("Numerator", "Denominator", "IndicatorValue",
+      "AggregationID", "IndicatorStartDate","IndicatorEndDate")
   )
 
-# NOTE: 
-
+# Group for all of Birmingham
 LARC_Birmingham <- LARC_GP %>%
   group_by(quarter) %>%
   # Remove cases with no denominator
@@ -222,20 +221,36 @@ LARC_Birmingham <- LARC_GP %>%
   select(-c("location", "quarter")) %>%
   mutate(
     AggregationID = 135
-  ) %>%
-  select(
-    c("Numerator", "Denominator", "IndicatorValue", "AggregationID",
-      "IndicatorStartDate","IndicatorEndDate")
+  ) %>% select(
+    c("Numerator", "Denominator", "IndicatorValue",
+      "AggregationID", "IndicatorStartDate","IndicatorEndDate")
   )
   
+# Combine PCN, locality, and LA parts
 output_df <- rbind(
   LARC_PCN,
   LARC_Locality,
   LARC_Birmingham
 ) %>%
   mutate(
+    # Create empty columns for unknown values/IDs
+    ValueID = "",
+    InsertDate = "",
+    DemographicID = "",
+    DataQualityID = "",
     IndicatorID = IndicatorID,
-    
+    # Calculate 95% Wilson confidence interval
+    Z = qnorm(0.975),
+    p_hat = IndicatorValue / 1000,
+    LowerCl95 = 1000 * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+    UpperCl95 = 1000 * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+  ) %>%
+  select(
+    c("ValueID", "IndicatorID", "InsertDate", 
+      "Numerator", "Denominator", "IndicatorValue","LowerCl95", "UpperCl95", 
+      "AggregationID", "DemographicID", "DataQualityID",
+      "IndicatorStartDate","IndicatorEndDate")
   )
 
-
+# Save output
+writexl::write_xlsx(output_df, "../data/output/0023_total_prescribed_larc_excluding_injections_rate.xlsx")
