@@ -1,33 +1,50 @@
+IndicatorID = 23				
+# DomainID =	3	
+# ReferenceID = 92254 (Actually 91819 since GP prescribed only)
+# ICBIndicatorTitle = Increase uptake of Long-acting reversible contraception	
+# IndicatorLabel Total prescribed LARC excluding injections rate / 1,000
+
 library(dplyr)
 library(tidyr)
 
-# base path
-path <- "//SVWCCG111/PublicHealth$/.Birmingham City Council/Contracts/1.New Filing System/Finance/"
+## Paths for data stored on BCC shared drive ##
 
-file_prefex = list(
-  "Qtr1 23-24" = "23-24/FP10 Folder/Qtr 1/",
-  "Qtr2 23-24" = "23-24/FP10 Folder/Qtr 2/",
-  "Qtr3 23-24" = "23-24/FP10 Folder/Qtr 3/"
+# larc data base path
+larc_path <- "//SVWCCG111/PublicHealth$/.Birmingham City Council/Contracts/1.New Filing System/Finance/"
+# BSol GP patient data base path
+GP_path <- "//SVWCCG111/PublicHealth$/2.0 KNOWLEDGE EVIDENCE & GOVERNANCE - KEG/2.12 PHM AND RESEARCH/Data/Primary Care/"
+
+# file prefixes and locations
+file_info <- data.frame(
+  quarter = c("Qtr1 23-24", "Qtr2 23-24", "Qtr3 23-24"),
+  location = c("23-24/FP10 Folder/Qtr 1/", "23-24/FP10 Folder/Qtr 2/",
+               "23-24/FP10 Folder/Qtr 3/"),
+  IndicatorStartDate = c("01/04/2023", "01/07/2023", "01/10/2023"),
+  IndicatorEndDate = c("31/06/2023", "30/09/2023", "31/01/2024")
 )
 
+# Prepare empty dataframe to append data to
 all_larc_data <- data.frame(
   `Practice Code` = character(),
-  Quarter = character(),
+  quarter = character(),
   total_prescriptions = numeric()
 )
 
-select_cols <- c("Quarter", "Practice Code", "Quantity", "Items")
+# columns to be selected from each spreadsheet
+select_cols <- c("Practice Code", "Quantity", "Items")
 
-for (quarter_i in names(file_prefex)) {
-  cat("\n")
+# loop over all quarters
+for (i in 1:nrow(file_info)) {
+  quarter_i <- file_info$quarter[i]
+  location_i <- file_info$location[i]
   print(quarter_i)
   
   # make file paths
-  path_i <- paste(path, file_prefex[quarter_i], sep = "")
+  path_i <- paste(larc_path, location_i, sep = "")
   
   #   Need to glue west and Bsol together
   file_name_both <- paste(path_i, "Sexual Health FP10 BSol ICS ", quarter_i, " - Actual.xlsx", sep = "")
-  print(paste("Sexual Health FP10 BSol ICS ", quarter_i, " - Actual", sep = ""))
+  #print(paste("Sexual Health FP10 BSol ICS ", quarter_i, " - Actual", sep = ""))
   
   # Load implant data 
   implant_i <- readxl::read_excel(file_name_both, sheet = "Implants", skip = 2) %>%
@@ -52,10 +69,10 @@ for (quarter_i in names(file_prefex)) {
       `Practice Code`
     ) %>%
     summarise(
-      total_prescriptions = sum(total_prescriptions)
+      Numerator = sum(total_prescriptions)
     ) %>%
     mutate(
-      Quarter = quarter_i
+      quarter = quarter_i
     )
     
   # Append to output dataframe
@@ -66,26 +83,159 @@ for (quarter_i in names(file_prefex)) {
   
 } # <<<---- Loop ended here
 
+# Load GP patient data
+# Group by GP
+# Sum all female patients in age range
+larc_eligible <- readxl::read_excel(
+  paste(GP_path, "BSOL GP Population List - Sept 2023.xlsx", sep =""),
+  sheet = "Dataset"
+) %>%
+  filter(
+    Gender_Desc == "Female" &
+      ProxyAgeAtEOM >= 15 &
+      ProxyAgeAtEOM <= 44 
+  ) %>%
+  mutate(
+    `Practice Code` = GP_Code
+  ) %>%
+  group_by(`Practice Code`) %>%
+  summarize(
+    Denominator = sum(Count)
+  )
 
-# Load patient data
+LARC_GP <- all_larc_data %>%
+  left_join(
+    larc_eligible, by = "Practice Code"
+  ) %>%
+  mutate(
+    IndicatorValue = 1000 * Numerator/Denominator 
+  ) %>%
+  select(
+    c("quarter", "Practice Code", "IndicatorValue", "Numerator", "Denominator")
+  ) %>%
+  left_join(
+    file_info,
+    by = "quarter"
+  ) %>%
+  select(-c("location"))
 
-# Group by GP and sum all female patients in age range
+# Lookup table for GP PCNs and Localities
+GP_lookup <- readxl::read_excel("../data/gp-mega-map-march-2024.xlsx") %>%
+  select(c("Practice Code", "Locality", "PCN"))
 
-# Join those data frames
-
-# Normalise prescriptions by patient numbers
+# OF Aggregation look-up
+OF_aggs <- readxl::read_excel(
+  "../data/OF-Other-Tables.xlsx", sheet = "Aggregation"
+  )
 
 # Group by PCN
+LARC_PCN <- LARC_GP %>%
+  left_join(
+    GP_lookup,
+    by = "Practice Code"
+  ) %>%
+  group_by(quarter, PCN) %>%
+  summarise(
+    Numerator = sum(Numerator),
+    Denominator = sum(Denominator),
+    IndicatorValue = 1000 * Numerator / Denominator
+  ) %>%
+  ungroup() %>%
+  select(
+    c("quarter", "PCN", "IndicatorValue", "Numerator", "Denominator")
+  ) %>%
+  left_join(
+    file_info,
+    by = "quarter"
+  ) %>%
+  select(-c("location", "quarter"))%>%
+  drop_na(PCN) %>%
+  # Join aggregation ID
+  fuzzyjoin::stringdist_join(
+    OF_aggs %>%
+      filter(AggregationType=="PCN"), 
+    by = c("PCN" = "AggregationLabel"),
+    method = "jw", #use jw distance metric
+    max_dist=0.1, 
+    distance_col='dist'
+  )%>%
+  group_by(PCN) %>%
+  slice_min(order_by=dist, n=1) %>%
+  ungroup() %>%
+  select(
+    c("Numerator", "Denominator", "IndicatorValue", "AggregationID",
+      "IndicatorStartDate","IndicatorEndDate")
+  )
 
 # Group by Locality
+LARC_Locality <- LARC_GP %>%
+  left_join(
+    GP_lookup,
+    by = "Practice Code"
+  ) %>%
+  group_by(quarter, Locality) %>%
+  summarise(
+    Numerator = sum(Numerator),
+    Denominator = sum(Denominator),
+    IndicatorValue = 1000 * Numerator / Denominator
+  ) %>%
+  ungroup() %>%
+  select(
+    c("quarter", "Locality", "IndicatorValue", "Numerator", "Denominator")
+  ) %>%
+  left_join(
+    file_info,
+    by = "quarter"
+  ) %>%
+  select(-c("location", "quarter")) %>%
+  drop_na(Locality) %>%
+  # Join aggregation ID
+  left_join(
+    OF_aggs %>%
+      filter(AggregationType=="Locality"), 
+    by = c("Locality" = "AggregationLabel"),
+  ) %>%
+  select(
+    c("Numerator", "Denominator", "IndicatorValue", "AggregationID",
+      "IndicatorStartDate","IndicatorEndDate")
+  )
 
+# NOTE: 
 
-# Combined for IDG (Includes PCN and Locality)
+LARC_Birmingham <- LARC_GP %>%
+  group_by(quarter) %>%
+  # Remove cases with no denominator
+  drop_na(Denominator) %>%
+  summarise(
+    Numerator = sum(Numerator),
+    Denominator = sum(Denominator),
+    IndicatorValue = 1000 * Numerator / Denominator
+  ) %>%
+  ungroup() %>%
+  select(
+    c("quarter", "IndicatorValue", "Numerator", "Denominator")
+  ) %>%
+  left_join(
+    file_info,
+    by = "quarter"
+  ) %>%
+  select(-c("location", "quarter")) %>%
+  mutate(
+    AggregationID = 135
+  ) %>%
+  select(
+    c("Numerator", "Denominator", "IndicatorValue", "AggregationID",
+      "IndicatorStartDate","IndicatorEndDate")
+  )
+  
+output_df <- rbind(
+  LARC_PCN,
+  LARC_Locality,
+  LARC_Birmingham
+) %>%
+  mutate(
+    IndicatorID = IndicatorID,
+    
+  )
 
-# Save ([AggID,] Date, Value, Numerator, Denominator, [Confidence Intervals])
-
-# Combined for community services dashboard
-
-#dataset_names <- list('GP' = by_GP, 'PCN' = by_PCN, 'Locality' = by_Locality)
-#write.xlsx(dataset_names, file = 'save-name.xlsx')
 
