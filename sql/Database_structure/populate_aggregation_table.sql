@@ -1,3 +1,8 @@
+
+
+Truncate table [OF].[Aggregation]
+GO
+
 /* PCN */
 Insert into [OF].[Aggregation]
 SELECT 'PCN' as Aggregation,
@@ -18,7 +23,7 @@ Where LAD19CD in( 'E08000025' --Birmingham
 				, 'E08000029' --Solihull
 				)
 
-/* Cnstituency */
+/* Constituency */
 Insert into [OF].[Aggregation]
 Select distinct		'Constituency' as AggregationType, 
 					[PCON19CD] as AggregationCode,
@@ -26,6 +31,37 @@ Select distinct		'Constituency' as AggregationType,
  from working.[DEFAULTS].[BSOL_0863_Ward(2019)_to_Constituency_toLA]
  Where LAD19CD in( 'E08000025' --Birmingham
 				, 'E08000029')
+				
+/* Locality */
+/* Two types: 'resident, using LSOA / Ward on ONS geography,  and 'registered' using GP registration / PCN*/
+/* No official code for these, so created 'BSOL' ones for consistency of table'*/
+Insert into [OF].[Aggregation]
+Select 'Locality (resident)'as AggregationType, 'BSOL001' as AggregationCode, 'Solihull' as AggregationLabel	
+UNION ALL
+Select 'Locality (resident)'as AggregationType, 'BSOL002' as AggregationCode, 'Central' as AggregationLabel	
+UNION ALL
+Select 'Locality (resident)'as AggregationType, 'BSOL003' as AggregationCode, 'North' as AggregationLabel	
+UNION ALL
+Select 'Locality (resident)'as AggregationType, 'BSOL004' as AggregationCode, 'East' as AggregationLabel	
+UNION ALL
+Select 'Locality (resident)'as AggregationType, 'BSOL005' as AggregationCode, 'South' as AggregationLabel	
+UNION ALL
+Select 'Locality (resident)'as AggregationType, 'BSOL006' as AggregationCode, 'West' as AggregationLabel	
+
+Insert into [OF].[Aggregation]
+Select 'Locality (registered)'as AggregationType, 'BSOL007' as AggregationCode, 'Solihull' as AggregationLabel	
+UNION ALL
+Select 'Locality (registered)'as AggregationType, 'BSOL008' as AggregationCode, 'Central' as AggregationLabel	
+UNION ALL
+Select 'Locality (registered)'as AggregationType, 'BSOL009' as AggregationCode, 'North' as AggregationLabel	
+UNION ALL
+Select 'Locality (registered)'as AggregationType, 'BSOL010' as AggregationCode, 'East' as AggregationLabel	
+UNION ALL
+Select 'Locality (registered)'as AggregationType, 'BSOL011' as AggregationCode, 'South' as AggregationLabel	
+UNION ALL
+Select 'Locality (registered)'as AggregationType, 'BSOL012' as AggregationCode, 'West' as AggregationLabel	
+
+
 
 
 /* Local Authority */
