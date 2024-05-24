@@ -254,8 +254,8 @@ output_df <- rbind(
     # Calculate 95% Wilson confidence interval
     Z = qnorm(0.975),
     p_hat = IndicatorValue / 1000,
-    LowerCl95 = 1000 * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-    UpperCl95 = 1000 * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator)
+    LowerCI95 = 1000 * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+    UpperCI95 = 1000 * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator)
   ) %>%
   select(
     c("ValueID", "IndicatorID", "InsertDate", 
@@ -265,4 +265,4 @@ output_df <- rbind(
   )
 
 # Save output
-writexl::write_xlsx(output_df, "../data/output/0023_total_prescribed_larc_excluding_injections_rate.xlsx")
+writexl::write_xlsx(output_df, "../data/output/birmingham-source/0023_total_prescribed_larc_excluding_injections_rate.xlsx")
