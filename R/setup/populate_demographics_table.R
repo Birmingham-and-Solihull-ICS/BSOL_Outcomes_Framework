@@ -56,6 +56,7 @@ imd5 <-  data.frame (
 ethnic_codes <- read.csv("data/nhs_ethnic_categories.csv", header=TRUE, check.names=FALSE)
 
 #demo, setting up the blank table 
+# Age and gender
 demo <- agegrp %>% 
   cross_join(gender) 
 
@@ -79,6 +80,7 @@ demoG <-
 #          Ethnicity = NA
 #   )
 
+# Age, gender, IMD
 demoi5 <- demo %>% cross_join(imd5) %>%
   mutate(Label = paste0(Gender,': ', AgeGrp,': IMD Quintile',IMD),
          Gender = Gender,
@@ -93,6 +95,7 @@ demoi5 <- demo %>% cross_join(imd5) %>%
 #          IMD = paste0('D',IMD),
 #          Ethnicity = NA  
 #   ) 
+# Age Gender Ethnicity
 demoE <- demo %>% cross_join(ethnic_codes) %>%
   mutate(Label = paste0(Gender,': ', AgeGrp,': ',ONSGroup) ,
          Gender = Gender,
@@ -102,23 +105,24 @@ demoE <- demo %>% cross_join(ethnic_codes) %>%
   ) %>%
   select(Label, Gender, AgeGrp, Ethnicity, IMD)
 
+# Local grouping suspended at this point.
+# demoEgrp <- demo %>% cross_join(ethnic_codes) %>%
+#   group_by(Gender, AgeGrp, LocalGrouping) %>%
+#   summarise(count = n()) %>%
+#   mutate(Label = paste0(Gender,': ', AgeGrp,': ',LocalGrouping) ,
+#          Gender = Gender,
+#          AgeGrp = AgeGrp,
+#          IMD = NA,
+#          Ethnicity = LocalGrouping 
+#   ) %>%
+#   select(- LocalGrouping, -count)
 
-demoEgrp <- demo %>% cross_join(ethnic_codes) %>%
-  group_by(Gender, AgeGrp, LocalGrouping) %>%
-  summarise(count = n()) %>%
-  mutate(Label = paste0(Gender,': ', AgeGrp,': ',LocalGrouping) ,
-         Gender = Gender,
-         AgeGrp = AgeGrp,
-         IMD = NA,
-         Ethnicity = LocalGrouping 
-  ) %>%
-  select(- LocalGrouping, -count)
-
+# Age gender, IMD, Ethnicity
 demoEi5 <- demoE %>% 
   select(-IMD) %>%
   cross_join(imd5) %>%
   #filter(IMD < 6)  %>%
-  mutate(Label = paste0(Label,': IMD Quintile',IMD) ,
+  mutate(Label = paste0(Label,': IMD Quintile', IMD) ,
          Gender = Gender,
          AgeGrp = AgeGrp,
          IMD = paste0('Q',IMD),
@@ -135,25 +139,41 @@ demoEi5 <- demoE %>%
 #          Ethnicity = Ethnicity 
 #   ) 
 
-demoEgrpi5 <- demoEgrp %>% 
-  select(-IMD) %>%
-  cross_join(imd5) %>%
-  #filter(IMD < 6)  %>%
-  mutate(Label = paste0(Label,': IMD Quintile',IMD) ,
-         Gender = Gender,
-         AgeGrp = AgeGrp,
-         IMD = paste0('Q',IMD),
-         Ethnicity = Ethnicity
-  ) 
+# # Age gender, IMD ethnicity
+# demoEgrpi5 <- demoEgrp %>% 
+#   select(-IMD) %>%
+#   cross_join(imd5) %>%
+#   #filter(IMD < 6)  %>%
+#   mutate(Label = paste0(Label,': IMD Quintile',IMD) ,
+#          Gender = Gender,
+#          AgeGrp = AgeGrp,
+#          IMD = paste0('Q',IMD),
+#          Ethnicity = Ethnicity
+#   ) 
 
 demo_table <- rbind(demoG, 
                     demoi5,
                     #demoi10,
                     demoE, 
-                    demoEgrp,
-                    demoEi5,
+                    #demoEgrp,
+                    demoEi5
                     #demoEi10,
-                    demoEgrpi5
+                    #demoEgrpi5
 )
 
-demo_table$DemographicID <- 1:nrow(demo_table)
+#demo_table$DemographicID <- 1:nrow(demo_table)
+
+# demo_table %>% 
+#   select(DemographicID, Label, Gender, AgeGrp, IMD, Ethnicity)
+
+library(DBI)
+con <- dbConnect(odbc::odbc(), .connection_string = "Driver={SQL Server};server=MLCSU-BI-SQL;database=EAT_Reporting_BSOL", 
+                 timeout = 10)
+
+# Write the table back
+# We have to use ID function to explain the schema 'OF' to dbWriteTable, else it
+# writes to 'dbo', the default schema.  
+out_tbl_demo <- Id("OF","Demographic")  
+DBI::dbWriteTable(con, out_tbl_demo, demo_table, overwrite = TRUE)
+
+    
