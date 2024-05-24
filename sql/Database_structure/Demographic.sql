@@ -15,9 +15,9 @@ CREATE TABLE [OF].[Demographic]
 	DemographicID smallint NOT NULL IDENTITY (1, 1),
 	DemographicLabel nvarchar(120),
 	Gender nvarchar(12),
-	IMD int,
-	AgeGrp nvarchar(20),
-	Ethnicity nvarchar(12)
+	IMD nvarchar(5),
+	AgeGrp nvarchar(50),
+	Ethnicity nvarchar(25)
 	)  ON [PRIMARY]
 GO
 

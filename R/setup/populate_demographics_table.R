@@ -161,6 +161,7 @@ demo_table <- rbind(demoG,
                     #demoEgrpi5
 )
 
+demo_table <- rename(demo_table, DemographicLabel = Label)
 #demo_table$DemographicID <- 1:nrow(demo_table)
 
 # demo_table %>% 
@@ -174,6 +175,6 @@ con <- dbConnect(odbc::odbc(), .connection_string = "Driver={SQL Server};server=
 # We have to use ID function to explain the schema 'OF' to dbWriteTable, else it
 # writes to 'dbo', the default schema.  
 out_tbl_demo <- Id("OF","Demographic")  
-DBI::dbWriteTable(con, out_tbl_demo, demo_table, overwrite = TRUE)
+DBI::dbWriteTable(con, out_tbl_demo, demo_table, overwrite = FALSE, append = TRUE)
 
-    
+
