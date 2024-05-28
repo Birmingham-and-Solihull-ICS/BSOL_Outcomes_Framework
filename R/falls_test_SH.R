@@ -48,70 +48,201 @@ gender_category <- 'Persons'
 # age_min: (optional) to accept indicator for specific min age & ALL ages
 # age_max: (optional) to accept indicator for specific max & ALL ages
 
-get_numerator <- function(indicator_dt, indicator_id, reference_id = NULL, age_min = NULL, age_max = NULL){
+get_numerator <- function(indicator_data, indicator_id, reference_id = NULL, age_min = NULL, age_max = NULL) {
   
-  
-  
-  if(missing(age_min) & missing(age_max) & missing(reference_id)){
-    indicator_dt <- indicator_dt %>% 
+  # Initial filter based on IndicatorID and optional ReferenceID
+  if (!is.null(reference_id)) {
+    filtered_data <- indicator_data %>%
+      filter(IndicatorID == indicator_id & ReferenceID == reference_id)
+  } else {
+    filtered_data <- indicator_data %>%
       filter(IndicatorID == indicator_id)
   }
-  else if(missing(age_max) | missing(reference_id)){
-    indicator_dt <- indicator_dt %>% 
-      filter(Age >= age_min &
-               IndicatorID == indicator_id)
-  }
-  else{
-    indicator_dt <- indicator_dt %>% 
-      filter(Age >= age_min & Age <= age_max) %>% 
-      filter(IndicatorID == indicator_id & 
-             ReferenceID == reference_id)
+  
+  # Apply age filters if provided
+  if (!is.null(age_min) & !is.null(age_max)) {
+    filtered_data <- filtered_data %>%
+      filter(Age >= age_min & Age <= age_max)
+  } else if (!is.null(age_min)) {
+    filtered_data <- filtered_data %>%
+      filter(Age >= age_min)
+  } else if (!is.null(age_max)) {
+    filtered_data <- filtered_data %>%
+      filter(Age <= age_max)
   }
   
-  output <- indicator_dt %>%
-    mutate(Financial_Year = str_replace(Financial_Year, "-", "/20")) %>%
-    rename(
-           FiscalYear = Financial_Year,
-           LSOA21CD = LSOA_2021,
-           WD22CD = Ward_Code,
-           WD22NM = Ward_Name,
-           LAD22CD = LAD_Code,
-           LAD22NM = LAD_Name,
-           Locality = Locality_Res,
-           EthnicityCode = Ethnicity_Code) %>% 
-    group_by(EthnicityCode, FiscalYear, LSOA21CD, WD22CD, WD22NM, 
-             LAD22CD, LAD22NM, Locality) %>% 
-    summarise(Numerator = sum(Numerator, na.rm = TRUE), .groups = "keep")
+  # Process the data to generate the output
+  output <- filtered_data %>% 
+    group_by(Ethnicity_Code, LSOA_2021, Age, Financial_Year) %>% 
+    summarise(Numerator = sum(Numerator, na.rm = TRUE), .groups = 'drop') %>% 
+    rename(Fiscal_Year = Financial_Year) %>% 
+    mutate(Fiscal_Year = str_replace(Fiscal_Year, "-", "/20"))
   
   return(output)
-  
 }
 
+numerator_data <- get_numerator(
+  indicator_data = indicator_data,
+  indicator_id = indicator_id,
+  reference_id = reference_id,
+  age_min = age_min
+)
+
+
+
+# get_numerator <- function(indicator_dt, indicator_id, reference_id = NULL, age_min = NULL, age_max = NULL){
+#   
+#   
+#   if(missing(age_min) & missing(age_max)){
+#     indicator_dt <- indicator_dt %>% 
+#       filter(IndicatorID == indicator_id | ReferenceID == reference_id)
+#   }
+#   else if(missing(age_max) | missing(reference_id)){
+#     indicator_dt <- indicator_dt %>% 
+#       filter(Age >= age_min &
+#                IndicatorID == indicator_id)
+#   }
+#   else{
+#     indicator_dt <- indicator_dt %>% 
+#       filter(Age >= age_min & Age <= age_max) %>% 
+#       filter(IndicatorID == indicator_id & 
+#              ReferenceID == reference_id)
+#   }
+#   
+#   output <- indicator_dt %>%
+#     mutate(Financial_Year = str_replace(Financial_Year, "-", "/20")) %>%
+#     rename(
+#            FiscalYear = Financial_Year,
+#            LSOA21CD = LSOA_2021,
+#            WD22CD = Ward_Code,
+#            WD22NM = Ward_Name,
+#            LAD22CD = LAD_Code,
+#            LAD22NM = LAD_Name,
+#            Locality = Locality_Res,
+#            EthnicityCode = Ethnicity_Code) %>% 
+#     group_by(EthnicityCode, Age, LSOA21CD, FiscalYear) %>% 
+#     summarise(Numerator = sum(Numerator, na.rm = TRUE))
+#   
+#   
+#   return(output)
+#   
+# }
+
+
+
 #3.3 Call function -------------------------------------------------------------
-numerator_data <- get_numerator(indicator_dt = indicator_dt,
-              indicator_id = indicator_id,
-              reference_id = reference_id,
-              age_min = age_min)
+numerator_data <- get_numerator(
+  indicator_data = indicator_dt,
+  indicator_id = indicator_id,
+  reference_id = reference_id,
+  age_min = age_min
+) # 20,933 obs, 5 variables
+
+indicator_dt %>% 
+  filter(Age >= age_min &
+           indicator_id == 11 &
+           reference_id == 22401) %>% 
+
+  group_by(Ethnicity_Code, Financial_Year, Ward_Code, Ward_Name, 
+           LAD_Code, Locality_Res) %>% 
+  summarise(Numerator = sum(Numerator, na.rm = TRUE)) %>% 
+  rename(Fiscal_Year = Financial_Year) %>% 
+  mutate(Fiscal_Year = str_replace(Fiscal_Year, "-", "/20")) %>% 
+  View()
 
 #4. Get denominator data -------------------------------------------------------
 
-#4.1 Read Census population estimates ------------------------------------------
+# Define the periods
+periods <- unique(numerator_data$FiscalYear[!is.na(numerator_data$FiscalYear)]) %>%
+  tibble() %>%
+  rename(FiscalYear = ".")
+
+# Read in ONS Population Estimates
 pop_estimates <- read.csv("data/C21_a86_e20_ward.csv",header = TRUE, check.names = FALSE) %>% 
   clean_names()
 
-#4.2 Read ethnicity code translation -------------------------------------------
+# Read in Ethnicity Codes Translation
 ethnic_codes <- read.csv("data/nhs_ethnic_categories.csv", header = TRUE, check.names = FALSE) %>%
   select(NHSCode, CensusEthnicGroup, NHSCodeDefinition)
 
-#4.3 Function 2: Process denominator data --------------------------------------
-# Parameters:
-# age_min: (optional) to get population estimates for specific min age & ALL ages
-# age_max: (optional) to get population estimates for specific max age & ALL ages
-# indicator_dt: numerator data set with which the population estimates will be joined
+# Read in LSOA to Ward to LAD Lookup
+lsoa_ward_lad <- read.csv("data/Lower_Layer_Super_Output_Area_(2021)_to_Ward_(2022)_to_LAD_(2022)_Lookup_in_England_and_Wales_v3.csv") %>% 
+  filter(LAD22CD %in% c('E08000025', 'E08000029'))
+
+# Get unique Ward-LAD Pairs 
+lsoa_LAD<-distinct(data.frame(lsoa_ward_lad$WD22CD,lsoa_ward_lad$LAD22CD)) %>%
+  rename("WD22CD"=1,"LAD22CD"=2)
+
+popfile_ward <- pop_estimates %>% 
+  inner_join(lsoa_LAD, by = c("electoral_wards_and_divisions_code" = "WD22CD"))  %>%
+  filter(age_86_categories_code >= age_min) %>%
+  group_by(electoral_wards_and_divisions_code, electoral_wards_and_divisions,
+           ethnic_group_20_categories_code, ethnic_group_20_categories) %>%
+  summarise(observation = sum(observation))
+
+#get IMD score by ward
+imd_england_ward <- IMD::imd_england_ward %>%
+  select(ward_code, Score)
+
+#add quintiles to ward
+#JA: ward by IMD quintiles
+imd_england_ward <- phe_quantile(imd_england_ward, Score, nquantiles = 5L, invert=TRUE)
+
+imd_england_ward <- imd_england_ward %>%
+  select(-Score, -nquantiles, -groupvars, -qinverted)
+
+#add quintile to popfile
+#JA: join the population with IMD (by ward) and join with the census ethnic code
+popfile_ward <- popfile_ward %>%
+  left_join(imd_england_ward, by = c("electoral_wards_and_divisions_code" = "ward_code")) %>% 
+  left_join(ethnic_codes, by = c("ethnic_group_20_categories_code" = "CensusEthnicGroup" ))
+
+pop_ward<- popfile_ward %>%
+  group_by(electoral_wards_and_divisions_code,electoral_wards_and_divisions,  ethnic_group_20_categories_code,
+           NHSCode, NHSCodeDefinition, quantile) %>%
+  summarise(Denominator = sum(observation, na.rm = TRUE))  %>%
+  cross_join(periods)
+
+pop_ward %>%
+  left_join(numerator_data, by = c("electoral_wards_and_divisions_code" = "WD22CD",
+                              "NHSCode" = "EthnicityCode",
+                              "FiscalYear" = "FiscalYear"
+                              
+  )) %>%
+  group_by(FiscalYear) %>% 
+  summarise(Numerator = sum(Numerator, na.rm = TRUE),
+            Denominator = sum(Denominator)) %>%
+  
+  View()
+
+
+#4.1 Function 2: Process denominator data --------------------------------------
+
+# get_denominator <- function(pop_estimates, lsoa_LAD_lookup, ethnicity_lookup, periods){
+#   
+#   # Create deprivation quintiles by Ward
+#   imd_england_ward <- IMD::imd_england_ward %>%
+#     select(ward_code, Score) %>%
+#     phe_quantile(Score, nquantiles = 5L, invert = TRUE) %>%
+#     select(ward_code, quantile) %>%
+#     mutate(quantile = paste0("Q", quantile))
+# 
+#   # Enrich the population estimates with the deprivation quintiles & ethnicity description
+#   output <- pop_estimates %>%
+#     inner_join(lsoa_LAD, by = c("electoral_wards_and_divisions_code" = "WD22CD")) %>%
+#     left_join(imd_england_ward, by = c("electoral_wards_and_divisions_code" = "ward_code")) %>%
+#     left_join(ethnic_codes, by = c("ethnic_group_20_categories_code" = "CensusEthnicGroup")) %>%
+#     group_by(electoral_wards_and_divisions_code, electoral_wards_and_divisions, ethnic_group_20_categories, NHSCode, NHSCodeDefinition, quantile) %>%
+#     summarise(Denominator = sum(observation, na.rm = TRUE), .groups = 'drop') %>%
+#     cross_join(periods) %>%
+#     clean_names(case = "upper_camel", abbreviations = c("NHS"))
+#   
+#   return(output)
+# }
 
 get_denominator <- function(age_min = NULL, age_max = NULL, indicator_dt){
-
-
+  
+  
   # Filter Census population estimates by min & max age (default: no filter)
   if (missing(age_min) & missing(age_max)){
     pop_estimates <- pop_estimates
@@ -121,24 +252,24 @@ get_denominator <- function(age_min = NULL, age_max = NULL, indicator_dt){
       filter(age_86_categories_code >= age_min)
   }
   else{
-
+    
     pop_estimates <- pop_estimates %>%
       filter(age_86_categories_code >= age_min & age_86_categories_code <= age_max)
   }
   
-
+  
   # Create deprivation quintiles by Ward
   imd_england_ward <- IMD::imd_england_ward %>%
     select(ward_code, Score) %>%
     phe_quantile(Score, nquantiles = 5L, invert = TRUE) %>%
     select(ward_code, quantile) %>%
     mutate(quantile = paste0("Q", quantile))
-
+  
   # Get unique periods
   periods <- unique(indicator_dt$FiscalYear[!is.na(indicator_dt$FiscalYear)]) %>%
     tibble() %>%
     rename(FiscalYear = ".")
-
+  
   # Enrich the population estimates with the deprivation quintiles & ethnicity
   # description
   output <- pop_estimates %>%
@@ -147,17 +278,36 @@ get_denominator <- function(age_min = NULL, age_max = NULL, indicator_dt){
     left_join(ethnic_codes,
               by = c("ethnic_group_20_categories_code" = "CensusEthnicGroup" )) %>%
     group_by(electoral_wards_and_divisions_code, electoral_wards_and_divisions,
-             ethnic_group_20_categories, NHSCode, NHSCodeDefinition, quantile) %>%
-    summarise(Denominator = sum(observation, na.rm = TRUE), .groups = "keep") %>%
+             ethnic_group_20_categories_code, NHSCode, NHSCodeDefinition, quantile) %>%
+    summarise(Denominator = sum(observation, na.rm = TRUE)) %>%
     cross_join(periods) %>%
     clean_names(case = "upper_camel", abbreviations = c("NHS"))
   
   return(output)
 }
 
-#4.4 Call function -------------------------------------------------------------
+#4.2 Call function -------------------------------------------------------------
+# denominator_data <- get_denominator(pop_estimates = pop_estimates,
+#                                     lsoa_LAD_lookup = lsoa_LAD,
+#                                     ethnicity_lookup = ethnic_codes,
+#                                     periods = periods)
+
 denominator_data <- get_denominator(age_min = age_min,  indicator_dt = numerator_data)
 
+denominator_data %>%
+  left_join(numerator_data, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD",
+                              "NHSCode" = "EthnicityCode",
+                              "FiscalYear" = "FiscalYear"
+                              
+  )) %>%
+  group_by(FiscalYear) %>% 
+  summarise(Numerator = sum(Numerator, na.rm = TRUE),
+            Denominator = sum(Denominator)) %>%
+  
+  View()
+
+
+# write.csv(denominator_data, "denominator_data.csv")
 
 #5. Crude Rates Calculation ----------------------------------------------------
 #5.1 Function 3: Calculate crude rates -----------------------------------------
@@ -169,6 +319,64 @@ denominator_data <- get_denominator(age_min = age_min,  indicator_dt = numerator
 # genderGrp: The gender for which the indicator was measured, e.g., c('Persons', 'Male', 'Female')
 # ageGrp: The age group for which the indicator was measured, e.g., c('65+', 'All ages', '0-18')
 
+denominator_unique <- denominator_data %>% 
+  group_by(ElectoralWardsAndDivisionsCode, ElectoralWardsAndDivisions, EthnicGroup20CategoriesCode,
+           NHSCode, NHSCodeDefinition, FiscalYear) %>% 
+  summarise(Denominator = sum(Denominator))
+
+
+numerator_unique <- numerator_data %>%
+  mutate(EthnicityCode = ifelse(EthnicityCode == "Z ", "Z", EthnicityCode)) %>% 
+  group_by(EthnicityCode, FiscalYear, WD22CD,WD22NM, LAD22CD, LAD22NM, Locality,
+           Numerator) %>%
+  summarise(Numerator = sum(Numerator, na.rm = TRUE)) %>%
+  
+  distinct()
+# 
+# 
+# joined_output <- denominator_data %>% 
+#   left_join(numerator_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD",
+#                                      "NHSCode" = "EthnicityCode",
+#                                      "FiscalYear" = "FiscalYear")) %>% 
+#   group_by(FiscalYear) %>% 
+#   summarise(Numerator = sum(Numerator, na.rm = TRUE),
+#             Denominator = sum(Denominator)) 
+
+write.csv(numerator_unique, "numerator_unique.csv")
+write.csv(denominator_unique, "denominator_unique.csv")
+
+
+denominator_unique %>% 
+  left_join(numerator_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD",
+                                     "NHSCode" = "EthnicityCode",
+                                     "FiscalYear" = "FiscalYear"),
+            keep = TRUE) %>%
+  View()
+
+  group_by(ElectoralWardsAndDivisionsCode, ElectoralWardsAndDivisions, EthnicGroup20CategoriesCode,
+           NHSCode, NHSCodeDefinition, FiscalYear.x) %>% 
+  summarise(count = n()) %>% 
+  arrange(desc(count)) %>% 
+  
+  View()
+
+print(unique(denominator_data$NHSCode))
+# joined_output <- denominator_data %>% 
+#   left_join(numerator_data %>% 
+#               select(-LSOA21CD), by = c("ElectoralWardsAndDivisionsCode" = "WD22CD",
+#                                      "ElectoralWardsAndDivisions" = "WD22NM",
+#                                    "NHSCode" = "EthnicityCode",
+#                                    "FiscalYear" = "FiscalYear"
+#                                    )) 
+# joined_output %>% 
+#   distinct() %>% 
+#   View()
+
+
+%>%
+  group_by(FiscalYear) %>% 
+  summarise(Numerator = sum(Numerator, na.rm = TRUE),
+            Denominator = sum(Denominator))
 
 calculate_crude_rate <- function(indicator_id, denominator_dt, numerator_dt, aggID, genderGrp, ageGrp, multiplier = 100000) {
   
@@ -177,7 +385,6 @@ calculate_crude_rate <- function(indicator_id, denominator_dt, numerator_dt, agg
       left_join(numerator_dt, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD",
                                      "NHSCode" = "EthnicityCode",
                                      "FiscalYear" = "FiscalYear")) %>%
-      filter(LAD22CD %in% c('E08000025', 'E08000029')) %>%
       group_by(
         if(id == "BSOL"){
           across(all_of(group_vars))
@@ -187,7 +394,9 @@ calculate_crude_rate <- function(indicator_id, denominator_dt, numerator_dt, agg
       ) %>%
       summarise(Numerator = sum(Numerator, na.rm = TRUE),
                 Denominator = sum(Denominator, na.rm = TRUE),
-                .groups = "keep") %>%
+                .groups = 'drop') %>%
+      mutate(Numerator = ifelse((is.na(Numerator) | Denominator==0), 0, Numerator),
+             Denominator=ifelse(Denominator==0,1,Denominator)) %>% # To handle cases where Denominator == 0 to avoid errors
       mutate(Gender = genderGrp,
              AgeGroup = ageGrp,
              IMD = ifelse("Quantile" %in% group_vars, Quantile, NA),  
@@ -199,7 +408,7 @@ calculate_crude_rate <- function(indicator_id, denominator_dt, numerator_dt, agg
                id == "LAD22CD" ~ "Local Authority District",
                TRUE ~ "Locality"
              ))%>%
-      filter(Denominator > 0 ) %>%
+      # filter(Denominator > 0 ) %>%
       group_by(AreaType, AggID, Gender, AgeGroup, IMD, EthnicityCode, FiscalYear) %>%
       phe_rate(Numerator, Denominator, type = "standard", multiplier = multiplier) %>%
       rename("IndicatorValue" = value,
@@ -279,7 +488,7 @@ crude_rates_data <- calculate_crude_rate(indicator_id = indicator_id,
                                 genderGrp = 'Persons', 
                                 ageGrp = '65+')
 
-
+write.csv(crude_rates_data, "output.csv")
 #6. Aggregated Crude Rates Calculation -----------------------------------------
 #6.1 Function 4: Calculate aggregated crude rates ------------------------------
 # Parameters:
@@ -359,3 +568,80 @@ agg_crude_rates_data <- calculate_agg_crude_rates(crude_rates_data)
 final_output <- bind_rows(crude_rates_data, agg_crude_rates_data)
 
 write.csv(final_output, "data/Outcome_Framework_data.csv")
+
+# unique_pairs <- indicator_data %>%
+#   distinct(ReferenceID, IndicatorID)
+# 
+# age_min <- c(NULL, 65, NULL, NULL, NULL)
+# age_max <- c(NULL, NULL, NULL, NULL, NULL)
+# indicator_id <- unique(unique_pairs$IndicatorID)
+# reference_id <- unique(unique_pairs$ReferenceID)
+# age_category <- c('All ages', '65+', 'All ages', 'All ages', 'All ages')
+# gender_category <- c('Persons', 'Persons', 'Persons', 'Persons', 'Persons')
+# 
+# # Create Parameter List
+# params_list <- list(
+#   indicator_id = indicator_id,
+#   reference_id = reference_id,
+#   age_min = age_min,
+#   age_max = age_max,
+#   age_category = age_category,
+#   gender_category = gender_category
+# )
+# params_df <- read_csv("parameter_combinations.csv", na = "NA", show_col_types = FALSE)
+# 
+# # Convert to list
+# params_list <- as.list(params_df)
+# 
+# 
+# get_numerator <- function(params, indicator_data) {
+#   # Extract parameters from the params list
+#   indicator_id <- params$IndicatorID
+#   reference_id <- params$ReferenceID
+#   age_min <- params$MinAge
+#   age_max <- params$MaxAge
+#   gender_category <- params$GenderCategory
+#   
+#   # Apply gender filter globally
+#   if (!is.null(gender_category) && !gender_category == "Persons") {
+#     indicator_data <- indicator_data %>%
+#       filter(Gender == gender_category)
+#   }
+#   
+#   # Apply other filters based on available parameters
+#   if (is.null(age_min) && is.null(age_max) && is.null(reference_id)) {
+#     indicator_data <- indicator_data %>%
+#       filter(IndicatorID == indicator_id)
+#   } else if (is.null(age_max) | is.null(reference_id)) {
+#     indicator_data <- indicator_data %>%
+#       filter(Age >= age_min & IndicatorID == indicator_id)
+#   } else {
+#     indicator_data <- indicator_data %>%
+#       filter(Age >= age_min & Age <= age_max) %>%
+#       filter(IndicatorID == indicator_id & ReferenceID == reference_id)
+#   }
+#   
+#   # Cleaning the column names and aggregating the result based on the specified parameters
+#   output <- indicator_data %>%
+#     mutate(Financial_Year = str_replace(Financial_Year, "-", "/20")) %>%
+#     janitor::clean_names(case = "upper_camel", abbreviations = c("LSOA", "ID", "LAD", "GP")) %>%
+#     rename(
+#       FiscalYear = FinancialYear,
+#       LSOA21CD = LSOA2021,
+#       WD22CD = WardCode,
+#       WD22NM = WardName,
+#       LAD22CD = LADCode,
+#       LAD22NM = LADName,
+#       Locality = LocalityRes
+#     ) %>%
+#     group_by(EthnicityCode, FiscalYear, LSOA21CD, WD22CD, WD22NM, LAD22CD, LAD22NM, Locality) %>%
+#     summarise(Numerator = sum(Numerator, na.rm = TRUE), .groups = "keep")
+#   
+#   return(output)
+# }
+# 
+# 
+# numerator_data_list <- pmap(params_df, get_numerator, indicator_data = indicator_data)
+# 
+# numerator_data <- bind_rows(numerator_data_list)
+
