@@ -427,10 +427,10 @@ aggregated_crude_rate_result <- calculate_aggregated_rate(crude_rate_data = crud
 final_output <- bind_rows(crude_rate_result, aggregated_crude_rate_result) %>% 
   mutate(ValueID = row_number())
 
-write.csv(final_output, "data/OF_dataset.csv")
+write.csv(final_output, "data/Falls_dataset.csv")
 
 # Process all parameters -------------------------------------------------------
-# WIP
+# WIP: Check the results are correct
 
 
 parameter_combinations <- read_csv("data/parameter_combinations.csv", show_col_types = FALSE)
@@ -519,4 +519,5 @@ results <- parameter_combinations %>%
   ungroup() #Remove the rowwise grouping, so the output is a simple tibble
 
 
+write.csv(results, "data/OF_dataset.csv")
 
