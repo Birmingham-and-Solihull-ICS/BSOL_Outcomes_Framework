@@ -2,7 +2,7 @@ IndicatorID = 23
 # DomainID =	3	
 # ReferenceID = 92254 (Actually 91819 since GP prescribed only)
 # ICBIndicatorTitle = Increase uptake of Long-acting reversible contraception	
-# IndicatorLabel Total prescribed LARC excluding injections rate / 1,000
+# IndicatorLabel = Total prescribed LARC excluding injections rate / 1,000
 # (Birmingham GP data only)
 
 library(dplyr)
@@ -17,13 +17,24 @@ GP_path <- "//SVWCCG111/PublicHealth$/2.0 KNOWLEDGE EVIDENCE & GOVERNANCE - KEG/
 
 # file prefixes and locations
 file_info <- data.frame(
-  quarter = c("Qtr1 23-24", "Qtr2 23-24", "Qtr3 23-24"),
-  location = c("23-24/FP10 Folder/Qtr 1/", "23-24/FP10 Folder/Qtr 2/",
-               "23-24/FP10 Folder/Qtr 3/"),
-  IndicatorStartDate = as.Date(c("01/04/2023", "01/07/2023", "01/10/2023"), 
-                               format = "%d/%m/%Y"),
-  IndicatorEndDate = as.Date(c("30/06/2023", "30/09/2023", "31/01/2024"), 
-                               format = "%d/%m/%Y")
+  quarter = c(
+    "Qtr2 22-23", "Qtr3 22-23", "Qtr4 22-23",
+    "Qtr1 23-24", "Qtr2 23-24", "Qtr3 23-24"),
+  location = c(
+    "22-23/FP10 Folder/Qtr 2/",
+    "22-23/FP10 Folder/Qtr 3/",
+    "22-23/FP10 Folder/Qtr 4/",
+    "23-24/FP10 Folder/Qtr 1/", 
+    "23-24/FP10 Folder/Qtr 2/",
+    "23-24/FP10 Folder/Qtr 3/"),
+  IndicatorStartDate = as.Date(c(
+    "01/07/2022", "01/10/2022", "01/02/2023",
+    "01/04/2023", "01/07/2023", "01/10/2023"
+    ), format = "%d/%m/%Y"),
+  IndicatorEndDate = as.Date(c(
+    "30/09/2022", "31/01/2023","31/03/2023",
+    "30/06/2023", "30/09/2023", "31/01/2024"
+    ), format = "%d/%m/%Y")
 )
 
 # Prepare empty dataframe to append data to
@@ -47,7 +58,7 @@ for (i in 1:nrow(file_info)) {
   
   #   Need to glue west and Bsol together
   file_name_both <- paste(path_i, "Sexual Health FP10 BSol ICS ", quarter_i, " - Actual.xlsx", sep = "")
-  #print(paste("Sexual Health FP10 BSol ICS ", quarter_i, " - Actual", sep = ""))
+  #print(file_name_both)
   
   # Load implant data 
   implant_i <- readxl::read_excel(file_name_both, sheet = "Implants", skip = 2) %>%
@@ -194,7 +205,7 @@ LARC_Locality <- LARC_GP %>%
   # Join aggregation ID
   left_join(
     OF_aggs %>%
-      filter(AggregationType=="Locality"), 
+      filter(AggregationType=="Locality (registered)"), 
     by = c("Locality" = "AggregationLabel"),
   ) %>% select(
     c("Numerator", "Denominator", "IndicatorValue",
@@ -237,14 +248,14 @@ output_df <- rbind(
     # Create empty columns for unknown values/IDs
     ValueID = "",
     InsertDate = "",
-    DemographicID = "",
-    DataQualityID = "",
+    DemographicID = "Persons",
+    DataQualityID = 2,
     IndicatorID = IndicatorID,
     # Calculate 95% Wilson confidence interval
     Z = qnorm(0.975),
     p_hat = IndicatorValue / 1000,
-    LowerCl95 = 1000 * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-    UpperCl95 = 1000 * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+    LowerCI95 = 1000 * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+    UpperCI95 = 1000 * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator)
   ) %>%
   select(
     c("ValueID", "IndicatorID", "InsertDate", 
@@ -254,4 +265,4 @@ output_df <- rbind(
   )
 
 # Save output
-writexl::write_xlsx(output_df, "../data/output/0023_total_prescribed_larc_excluding_injections_rate.xlsx")
+writexl::write_xlsx(output_df, "../data/output/birmingham-source/0023_total_prescribed_larc_excluding_injections_rate.xlsx")
