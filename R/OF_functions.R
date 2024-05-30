@@ -134,8 +134,8 @@ numerator_data <- get_numerator(
 ##4.3 Function 2: Process Denominator Data  ------------------------------------
 
 # Parameters:
-# min_age: (Optional) To accept indicator with specific min age & ALL ages
-# max_age: (Optional) To accept indicator with specific max & ALL ages
+# min_age: (Optional) To accept indicator with specific min age
+# max_age: (Optional) To accept indicator with specific max
 # pop_estimates: Population file by Ward
 # numerator_data: The filtered numerator dataset to get the available periods
 
@@ -429,9 +429,7 @@ final_output <- bind_rows(crude_rate_result, aggregated_crude_rate_result) %>%
 
 write.csv(final_output, "data/Falls_dataset.csv")
 
-# Process all parameters -------------------------------------------------------
-# WIP: Check the results are correct
-
+#7. Process all parameters -------------------------------------------------------
 
 parameter_combinations <- read_csv("data/parameter_combinations.csv", show_col_types = FALSE)
 
@@ -486,7 +484,7 @@ process_parameters <- function(row) {
       # Create an empty dataframe with the correct column types and NA values
       final_output <- tibble(
         ValueID = NA_integer_,
-        IndicatorID = NA_integer_,
+        IndicatorID = NA_real_,
         InsertDate = as.Date(NA),
         Numerator = NA_real_,
         Denominator = NA_real_,
