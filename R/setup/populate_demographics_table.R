@@ -54,6 +54,9 @@ imd5 <-  data.frame (
 #imd <- read.csv("imdid.txt")
 
 ethnic_codes <- read.csv("data/nhs_ethnic_categories.csv", header=TRUE, check.names=FALSE)
+ethnic_codes <- 
+  ethnic_codes %>% 
+  distinct(ONSGroup)
 
 #demo, setting up the blank table 
 # Age and gender
@@ -129,6 +132,10 @@ demoEi5 <- demoE %>%
          Ethnicity = Ethnicity 
   ) 
 
+a <- demoEi5 %>%  distinct()
+b <- demoE %>%  distinct()
+
+anti_join(a, demoEi5)
 # demoEi10 <- demoE %>% 
 #   select(-IMD) %>%
 #   cross_join(imd) %>%
@@ -163,7 +170,7 @@ demo_table <- rbind(demoG,
 
 demo_table <- rename(demo_table, DemographicLabel = Label)
 #demo_table$DemographicID <- 1:nrow(demo_table)
-
+demo_table %>%  distinct() %>%  count()
 # demo_table %>% 
 #   select(DemographicID, Label, Gender, AgeGrp, IMD, Ethnicity)
 
@@ -175,6 +182,7 @@ con <- dbConnect(odbc::odbc(), .connection_string = "Driver={SQL Server};server=
 # We have to use ID function to explain the schema 'OF' to dbWriteTable, else it
 # writes to 'dbo', the default schema.  
 out_tbl_demo <- Id("OF","Demographic")  
+DBI::dbExecute(con, "TRUNCATE TABLE [OF].[Demographic]")
 DBI::dbWriteTable(con, out_tbl_demo, demo_table, overwrite = FALSE, append = TRUE)
 
 
