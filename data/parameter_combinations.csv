@@ -1,6 +1,6 @@
-﻿IndicatorID,ReferenceID,MinAge,MaxAge,AgeCategory,GenderCategory
-11,22401,65,,65+ yrs,Persons
-49,93229,,,All ages,Persons
-50,93231,,,All ages,Persons
-51,93232,,,All ages,Persons
-124,93575,,,All ages,Persons
+﻿IndicatorID,ReferenceID,MinAge,MaxAge,AgeCategory,GenderCategory,StandardizedIndicator
+11,22401,65,,65+ yrs,Persons,N
+49,93229,,,All ages,Persons,Y
+50,93231,,,All ages,Persons,Y
+51,93232,,,All ages,Persons,Y
+124,93575,,,All ages,Persons,N
