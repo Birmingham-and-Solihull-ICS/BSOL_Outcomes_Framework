@@ -60,12 +60,38 @@ IndicatorMetadata <-
   inner_join(md_items_server, by=c("name"="ItemLabel")) %>% 
   select(IndicatorID, ItemID, MetaValue = value)
 
+
+# Add ID back in properly, as currently it is the external ID (Fingertips)
+
+# Read back IDs from table on server to replace key in metadata list
+sql3 <- "Select distinct IndicatorID, ReferenceID from [OF].[IndicatorList]"
+
+ID_items_server <- dbGetQuery(con, sql3) 
+
+# reformat character to integer
+ID_items_server <-
+  ID_items_server %>% 
+  mutate(ReferenceID = as.numeric(ReferenceID))
+
+# There's a one-to-many relationship for indicators 40 and 41 which are both the same fingertips indicatior.
+# Row count increases 2480 to 2511, checked for first release.
+
+IndicatorMetadata <- IndicatorMetadata %>% 
+  inner_join(ID_items_server, by = c("IndicatorID" = "ReferenceID")) %>% 
+  select(-IndicatorID) %>% 
+  rename(IndicatorID = IndicatorID.y) %>% 
+  select(IndicatorID, ItemID, MetaValue)
+
+
+
  
 # Write the table back
 # We have to use ID function to explain the schema 'OF' to dbWriteTable, else it
 # writes to 'dbo', the default schema.  
 out_tbl_metadata <- Id("OF","IndicatorMetadata")  
-DBI::dbWriteTable(con, out_tbl_metadata, IndicatorMetadata, append = TRUE)
+DBI::dbWriteTable(con, out_tbl_metadata, IndicatorMetadata, overwrite = TRUE)
+
+
 
 
 
