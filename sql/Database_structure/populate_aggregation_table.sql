@@ -73,7 +73,7 @@ Select 'Local Authority'as AggregationType, 'E08000025' as AggregationCode, 'Bir
 
 /* ICB */
 Insert into [OF].[Aggregation]
-Select 'ICB'as AggregationType, 'E08000025' as AggregationCode, 'BSOL ICB' as AggregationLabel	
+Select 'ICB'as AggregationType, 'E38000258' as AggregationCode, 'BSOL ICB' as AggregationLabel	
 
 /* ENgland */
 Insert into [OF].[Aggregation]
