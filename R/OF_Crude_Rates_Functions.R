@@ -28,12 +28,18 @@ lsoa_ward_lad_map<-read.csv("data/Lower_Layer_Super_Output_Area_(2021)_to_Ward_(
 lsoa_ward_lad_map <- lsoa_ward_lad_map %>% 
   filter(LAD22CD %in% c('E08000025', 'E08000029'))
 
+# Get unique pairs of WD22CD and LAD22CD
+Ward_LAD_unique <- lsoa_ward_lad_map %>% 
+  select(WD22CD, LAD22CD) %>% 
+  distinct()
+
 ##2.2 Ward to Locality lookup --------------------------------------------------
 ward_locality_map <- read.csv("data/ward_to_locality.csv", header = TRUE, check.names = FALSE)
 ward_locality_map <- ward_locality_map %>% 
   rename(LA = ParentCode,
          WardCode = AreaCode,
          WardName = AreaName)
+
 
 ##2.3 Ethnicity code mapping ---------------------------------------------------
 ethnicity_map <- dbGetQuery(
@@ -50,18 +56,36 @@ ethnicity_map <- dbGetQuery(
 popfile_ward <- read.csv("data/C21_a86_e20_ward.csv", header = TRUE, check.names = FALSE) %>% 
   clean_names()
 
+
 #3. Get numerator data ---------------------------------------------------------
 #3.1 Load the indicator data from the warehouse --------------------------------
 
-indicator_data <- dbGetQuery(
-  con,
-  "SELECT *
-   FROM [EAT_Reporting_BSOL].[OF].[IndicatorData]") %>% 
+# Read the CSV file to get the available indicators
+parameter_combinations <- read_csv("data/parameter_combinations.csv", show_col_types = FALSE)
+
+# Filter based on indicators requiring age-standardization
+indicators_params <- parameter_combinations %>% 
+  filter(StandardizedIndicator == 'N') # The flag used to choose which indicators 
+
+# Get the unique indicator IDs to be used for importing data from database
+indicator_ids <- unique(indicators_params$IndicatorID)
+
+# Convert the indicator IDs to a comma-separated values
+indicator_ids <- paste(indicator_ids, collapse = ", ")
+
+# Construct the SQL query with the indicator IDs
+query <- paste0("SELECT *
+                FROM [EAT_Reporting_BSOL].[OF].[IndicatorData]
+                WHERE IndicatorID IN (", indicator_ids, ")")
+
+# Execute the SQL query
+indicator_data <- dbGetQuery(con, query) %>% 
   as_tibble() %>% 
   mutate(Ethnicity_Code = trimws(Ethnicity_Code)) # Remove trailing spaces
 
 #4. Data preparation -----------------------------------------------------------
 ##4.1 Function 1: Create aggregated data ---------------------------------------
+# Used to aggregate either numerator or denominator data based on the specified year
 
 # Parameters:
 # data: Numerator or denominator data used to create aggregated data
@@ -69,6 +93,7 @@ indicator_data <- dbGetQuery(
 # type: Specifies which aggregated data needs to be created; default is "numerator"
 
 create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator") {
+  
   aggregated_data = list()
   
   for (year in agg_years){
@@ -178,6 +203,13 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
   return(output)
 }
 
+# Example
+my_numerator <- get_numerator(indicator_data = indicator_data,
+                                   indicator_id = 11,
+                                   min_age = 65,
+                                   max_age = NA)
+
+
 ##4.3 Function 3: Create denominator dataset  ----------------------------------
 
 # Parameters:
@@ -188,14 +220,10 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
 
 get_denominator <- function(min_age = NA, max_age = NA, pop_estimates, numerator_data){
   
-  # Get unique pairs of WD22CD and LAD22CD
-  LSOA_LAD_unique <- lsoa_ward_lad_map %>% 
-    select(WD22CD, LAD22CD) %>% 
-    distinct()
   
   # Map the population estimates to the unique Wards and LADs
   pop_estimates <- pop_estimates %>% 
-    inner_join(LSOA_LAD_unique, 
+    inner_join(Ward_LAD_unique, 
                by = c("electoral_wards_and_divisions_code" = "WD22CD"))
   
   # Apply age filters if provided
@@ -239,10 +267,11 @@ get_denominator <- function(min_age = NA, max_age = NA, pop_estimates, numerator
     summarise(Denominator = as.numeric(sum(observation, na.rm = TRUE)), .groups = 'drop') %>%
     cross_join(periods) %>%
     clean_names(case = "upper_camel", abbreviations = c("NHS", "ONS")) %>% 
-    mutate(AggYear = 1)
+    mutate(AggYear = 1, DataQualityID = 1) %>% 
+    filter(!is.na(ONSGroup))
   
-  # Get the aggregated numerator data for 3- and 5-year rolling periods
-  aggregated_data <- create_aggregated_data(output, agg_years = c(3, 5), type = "denominator")
+  # Get the aggregated denominator data for 3- and 5-year rolling periods
+  aggregated_data <- create_aggregated_data(output, agg_years = c(3, 5), type = "denominator") 
   
   # Combine all data into one dataframe
   output <- bind_rows(output,aggregated_data)
@@ -250,11 +279,11 @@ get_denominator <- function(min_age = NA, max_age = NA, pop_estimates, numerator
   return(output)
 }
 
-denominator_data <- get_denominator(min_age = 65,
+# Example
+my_denominator <- get_denominator(min_age = 65,
                                     max_age = NA,
                                     pop_estimates = popfile_ward, 
-                                    numerator_data = numerator_data
-)
+                                    numerator_data = my_numerator)
 
 
 #5. Crude Rates Calculation ----------------------------------------------------
@@ -269,16 +298,68 @@ denominator_data <- get_denominator(min_age = 65,
 # ageGrp: The age group for which the indicator was measured, e.g., c('All ages')
 # multiplier: The scale at which the rates are calculated, e.g., 100000 by default
 
-calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data, aggID, genderGrp, ageGrp, multiplier = 100000) {
+# Helper function to determine grouping columns based on rate type
+get_grouping_columns <- function(rate_type) {
+  base_group_vars <- c("FiscalYear", "DataQualityID")
+  
+  switch(rate_type,
+         "overall" = base_group_vars,
+         "ethnicity" = c(base_group_vars, "ONSGroup"),
+         "deprivation" = c(base_group_vars, "Quantile"),
+         "ethnicity_deprivation" = c(base_group_vars, "ONSGroup", "Quantile"),
+         stop("Invalid rate type specified.")
+  )
+}
+
+
+# Helper function to summarize numerator and denominator data with the correct 'DataQualityID'
+get_summarized_data <- function(id, group_vars, year, denominator_data, numerator_data) {
   
   # Get unique pairs of Wards and Localities
   Localities_Ward_unique <- numerator_data %>% 
     select(Locality, WD22CD, WD22NM) %>% 
     distinct()
   
-  # Get unique pairs of Wards and LADs
-  LSOA_LAD_unique <- lsoa_ward_lad_map %>% 
-    select(WD22CD, LAD22CD) %>% 
+  summarized_data <- denominator_data %>%
+    filter(AggYear == year) %>%
+    left_join(numerator_data %>% filter(AggYear == year),
+              by = c("ElectoralWardsAndDivisionsCode" = "WD22CD",
+                     "NHSCode" = "EthnicityCode",
+                     "FiscalYear" = "FiscalYear"))
+  
+  if (id == "WD22NM") {
+    summarized_data <- summarized_data %>%
+      left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+      group_by(across(all_of(c(group_vars, "WD22NM.y"))))
+  } else if (id == "LAD22CD") {
+    summarized_data <- summarized_data %>%
+      left_join(Ward_LAD_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+      group_by(across(all_of(c(group_vars, "LAD22CD.y"))))
+  } else if (id == "Locality") {
+    summarized_data <- summarized_data %>%
+      left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+      group_by(across(all_of(c(group_vars, "Locality.y"))))
+  } else if (id == "BSOL ICB") {
+    summarized_data <- summarized_data %>%
+      group_by(across(all_of(group_vars)))
+  }
+  
+  summarized_data <- summarized_data %>%
+    summarise(Numerator = sum(Numerator, na.rm = TRUE),
+              Denominator = sum(Denominator),
+              .groups = 'drop') %>%
+    mutate(DataQualityID = ifelse(Denominator == 0, 5, 1))
+  
+  return(summarized_data)
+}
+
+
+# Main function to calculate crude rate
+calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data, aggID, genderGrp, ageGrp, multiplier = 100000) {
+  
+  # Get unique pairs of Wards and Localities
+  Localities_Ward_unique <- numerator_data %>% 
+    select(Locality, WD22CD, WD22NM) %>% 
     distinct()
   
   # Aggregation years to calculate crude rates for 1, 3 and 5 rolling periods
@@ -287,7 +368,7 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
   # Initialize an empty list to store results
   results <- list()
   
-  for(year in AggYears){
+  for(year in AggYears) {
     
     # Helper function to calculate rates
     calculate_rate <- function(id, group_vars) {
@@ -308,7 +389,7 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
         
       } else if (id == "LAD22CD") {
         joined_data <- joined_data %>%
-          left_join(LSOA_LAD_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+          left_join(Ward_LAD_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
           group_by(across(all_of(c(group_vars, "LAD22CD.y")))) # Grouping by LAD22CD.y
         
       } else if (id == "Locality") {
@@ -337,6 +418,7 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
           AgeGroup = ageGrp,
           IMD = ifelse("Quantile" %in% group_vars, Quantile, NA_character_),  
           EthnicityCode = as.character(ifelse("ONSGroup" %in% group_vars, ONSGroup, NA_character_)),
+          DataQualityID = 1, # Added DataQualityID
           AggregationLabel = ifelse(id == "BSOL ICB", id, !!sym(paste0(id, ".y"))),
           AggregationType = case_when(
             id == "BSOL ICB" ~ "ICB",
@@ -345,7 +427,7 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
             TRUE ~ "Locality (resident)"
           )
         ) %>%
-        group_by(AggregationType, AggregationLabel, Gender, AgeGroup, IMD, EthnicityCode, FiscalYear) %>%
+        group_by(AggregationType, AggregationLabel, Gender, AgeGroup, IMD, EthnicityCode, FiscalYear, DataQualityID) %>%
         phe_rate(Numerator, Denominator, type = "standard", multiplier = multiplier) %>%
         rename(
           IndicatorValue = value,
@@ -356,26 +438,82 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
       return(summarized_data)
     }
     
-    
     for (id in aggID) {
       # Overall indicator rate
       overall_rate <- calculate_rate(id = id, group_vars = c("FiscalYear")) %>%
-        mutate(IndicatorValueType = paste0(year, "-year Overall Crude Rate"))
+        mutate(IndicatorValueType = paste0(year, "-year Overall Crude Rate")) %>%
+        left_join(get_summarized_data(id = id,
+                                      group_vars = get_grouping_columns(rate_type = "overall"),
+                                      year = year,
+                                      denominator_data = denominator_data,
+                                      numerator_data = numerator_data),
+                  by = if(id == "BSOL ICB"){
+                    c("FiscalYear" = "FiscalYear")
+                  } else{
+                    c("AggregationLabel" = paste0(id, ".y"),
+                      "FiscalYear" = "FiscalYear")
+                  }) %>%
+        select(-Numerator.x, -Denominator.x, -DataQualityID.x) %>%
+        rename_with(~ str_replace(., "\\.y$", ""))
       
       # Ethnicity indicator rate
       ethnicity_rate <- calculate_rate(id = id, group_vars = c("FiscalYear", "ONSGroup")) %>%
-        mutate(IndicatorValueType = paste0(year, "-year Ethnicity Crude Rate")) %>% 
-        filter(!is.na(EthnicityCode))
-      
+        mutate(IndicatorValueType = paste0(year, "-year Ethnicity Crude Rate")) %>%
+        left_join(get_summarized_data(id = id,
+                                      group_vars = get_grouping_columns(rate_type = "ethnicity"),
+                                      year = year,
+                                      denominator_data = denominator_data,
+                                      numerator_data = numerator_data),
+                  by = if(id == "BSOL ICB"){
+                    c("FiscalYear" = "FiscalYear", 
+                      "EthnicityCode" = "ONSGroup")
+                  } else{
+                    c("AggregationLabel" = paste0(id, ".y"),
+                      "FiscalYear" = "FiscalYear",
+                      "EthnicityCode" = "ONSGroup")
+                  }) %>%
+        select(-Numerator.x, -Denominator.x, -DataQualityID.x) %>%
+        rename_with(~ str_replace(., "\\.y$", ""))
+
       # IMD indicator rate
       imd_rate <- calculate_rate(id = id, group_vars = c("FiscalYear", "Quantile")) %>%
         mutate(IndicatorValueType = paste0(year, "-year IMD Crude Rate")) %>% 
-        filter(!is.na(IMD))
+        left_join(get_summarized_data(id = id,
+                                      group_vars = get_grouping_columns(rate_type = "deprivation"),
+                                      year = year,
+                                      denominator_data = denominator_data,
+                                      numerator_data = numerator_data),
+                  by = if(id == "BSOL ICB"){
+                    c("FiscalYear" = "FiscalYear", 
+                      "IMD" = "Quantile")
+                  } else{
+                    c("AggregationLabel" = paste0(id, ".y"),
+                      "FiscalYear" = "FiscalYear",
+                      "IMD" = "Quantile")
+                  }) %>%
+        select(-Numerator.x, -Denominator.x, -DataQualityID.x) %>%
+        rename_with(~ str_replace(., "\\.y$", ""))
       
       # Ethnicity by IMD indicator rate
       ethnicity_imd_rate <- calculate_rate(id = id, group_vars = c("FiscalYear", "ONSGroup", "Quantile")) %>%
         mutate(IndicatorValueType = paste0(year, "-year EthnicityXIMD Crude Rate")) %>% 
-        filter(!is.na(EthnicityCode))
+        left_join(get_summarized_data(id = id,
+                                      group_vars = get_grouping_columns(rate_type = "ethnicity_deprivation"),
+                                      year = year,
+                                      denominator_data = denominator_data,
+                                      numerator_data = numerator_data),
+                  by = if(id == "BSOL ICB"){
+                    c("FiscalYear" = "FiscalYear",
+                      "EthnicityCode" = "ONSGroup",
+                      "IMD" = "Quantile")
+                  } else{
+                    c("AggregationLabel" = paste0(id, ".y"),
+                      "FiscalYear" = "FiscalYear",
+                      "EthnicityCode" = "ONSGroup",
+                      "IMD" = "Quantile")
+                  }) %>%
+        select(-Numerator.x, -Denominator.x, -DataQualityID.x) %>%
+        rename_with(~ str_replace(., "\\.y$", ""))
       
       # Combine all rates into a single data frame
       results[[paste0(id, "_", year, "YR")]] <- bind_rows(
@@ -385,42 +523,43 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
         ethnicity_imd_rate
       ) %>% mutate(EthnicityCode = as.character(EthnicityCode)) # Ensure EthnicityCode is character before binding
     }
-    
-    # Bind all results together into a single data frame
-    final_results <- bind_rows(results)
-    
-    # Add the rest of the variables as per the OF data model
-    output <- final_results %>%
-      filter(FiscalYear != '2013/2014') %>%
-      mutate(
-        IndicatorID = indicator_id,
-        InsertDate = today(),
-        IndicatorStartDate = as.Date(ifelse(is.na(FiscalYear), NA, paste0(substring(FiscalYear, 1, 4), '-04-01'))),
-        IndicatorEndDate = as.Date(ifelse(is.na(FiscalYear), NA, paste0('20', substring(FiscalYear, 8, 9), '-03-31'))),
-        StatusID = as.integer(1), # current
-        DataQualityID = as.integer(1) # No issues
-      ) %>%
-      clean_names(case = "upper_camel", abbreviations = c("ID", "IMD", "CI")) %>% 
-      select(
-        IndicatorID, InsertDate, Numerator, Denominator, IndicatorValue, IndicatorValueType,
-        LowerCI95, UpperCI95, AggregationType, AggregationLabel, FiscalYear, Gender, AgeGroup, IMD, EthnicityCode, 
-        StatusID, DataQualityID, IndicatorStartDate, IndicatorEndDate
-      )
-    
   }
+  
+  # Bind all results together into a single data frame
+  final_results <- bind_rows(results)
+  
+  # Add the rest of the variables as per the OF data model
+  output <- final_results %>%
+    filter(FiscalYear != '2013/2014') %>%
+    mutate(
+      IndicatorID = indicator_id,
+      InsertDate = today(),
+      IndicatorStartDate = as.Date(ifelse(is.na(FiscalYear), NA, paste0(substring(FiscalYear, 1, 4), '-04-01'))),
+      IndicatorEndDate = as.Date(ifelse(is.na(FiscalYear), NA, paste0('20', substring(FiscalYear, 8, 9), '-03-31'))),
+      StatusID = as.integer(1)) %>%
+    clean_names(case = "upper_camel", abbreviations = c("ID", "IMD", "CI")) %>%
+    select(
+      IndicatorID, InsertDate,Numerator, Denominator, IndicatorValue, IndicatorValueType,
+      LowerCI95, UpperCI95, AggregationType, AggregationLabel, FiscalYear, Gender, AgeGroup, IMD, EthnicityCode,
+      StatusID, DataQualityID, IndicatorStartDate, IndicatorEndDate)
+    
   
   return(output)
 }
 
+# Example 
+result <- calculate_crude_rate(
+  indicator_id = 11,
+  denominator_data = my_denominator,
+  numerator_data = my_numerator,
+  aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
+  genderGrp = "Persons",
+  ageGrp = "65+ yrs",
+  multiplier = 100000
+)
+
 
 #6. Process all parameters -------------------------------------------------------
-
-# Read the parameter combinations for the available indicators
-parameter_combinations <- read_csv("data/parameter_combinations.csv", show_col_types = FALSE)
-
-# Filter based on the indicators requiring age-standardization
-indicators_params <- parameter_combinations %>% 
-  filter(StandardizedIndicator == 'N') # The flag used to choose which indicators 
 
 ## 6.1 Function 5: Apply functions to specific parameter combinations ----------
 
