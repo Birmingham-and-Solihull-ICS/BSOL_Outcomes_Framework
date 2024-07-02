@@ -676,4 +676,4 @@ end_time <- Sys.time()
 time_taken <- end_time - start_time
 
 # Print the time taken
-print(paste("Time taken to run the script", time_taken))
+print(paste("Time taken to run the script", time_taken))  # 6.20319673220317

@@ -63,7 +63,7 @@ parameter_combinations <- read_csv("data/parameter_combinations.csv", show_col_t
 
 # Filter based on indicators requiring age-standardization
 indicators_params <- parameter_combinations %>% 
-  filter(StandardizedIndicator == 'Y') # The flag used to choose which indicators 
+  filter(StandardizedIndicator == 'Y')  # The flag used to choose which indicators 
 
 # Get the unique indicator IDs to be used for importing data from database
 indicator_ids <- unique(indicators_params$IndicatorID)
@@ -147,7 +147,7 @@ create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator"
 # indicator_id: Indicator ID
 # reference_id: (Optional) Fingertips ID if available
 
-get_numerator <- function(indicator_data, indicator_id, reference_id = NA) {
+get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_age = NA, max_age = NA) {
   
   # Initial filter based on Indicator ID and optional Reference ID
   if (!is.na(reference_id)) {
@@ -158,10 +158,23 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA) {
       filter(IndicatorID == indicator_id)
   }
   
+  # Apply age filters if provided
+  if (!is.na(min_age) & !is.na(max_age)) {
+    filtered_data <- filtered_data %>%
+      filter(Age >= min_age & Age <= max_age)
+  } else if (!is.na(min_age)) {
+    filtered_data <- filtered_data %>%
+      filter(Age >= min_age)
+  } else if (!is.na(max_age)) {
+    filtered_data <- filtered_data %>%
+      filter(Age <= max_age)
+  }
+  
+  
   filtered_output <- filtered_data %>%
     group_by(IndicatorID, ReferenceID, Ethnicity_Code, LSOA_2021, Age, Financial_Year) %>% 
     summarise(Numerator = sum(Numerator, na.rm = TRUE), .groups = 'drop')
-  
+
   # Create 5-year age bands
   # Define the labels for the age bands
   age_labels <- c(
@@ -184,11 +197,11 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA) {
     "Aged 80 to 84 years",
     "Aged 85 years and over"
   )
-  
+
   # Create age bands and assign labels
   output <- filtered_output %>%
     mutate(
-      AgeBandCode = cut( Age, 
+      AgeBandCode = cut( Age,
                          breaks = c(seq(0, 85, by = 5), Inf), # Ensures the last break is Inf for ages 85 and over
                          labels = FALSE,                      # No labels assigned to the age band codes
                          right = FALSE,                       # Ensures that intervals are left-closed (e.g., [0, 5) means 0 <= Age < 5).
@@ -196,19 +209,19 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA) {
       AgeBandCategory = age_labels[AgeBandCode]               # Uses the code to look up the corresponding label
     )
 
-    
+
   # Process the data to generate the output
   output <- output %>%
-    left_join(ethnicity_map, by = c("Ethnicity_Code" = "NHSCode")) %>% 
+    left_join(ethnicity_map, by = c("Ethnicity_Code" = "NHSCode")) %>%
     left_join(lsoa_ward_lad_map, by = c("LSOA_2021" = "LSOA21CD")) %>%
     left_join(ward_locality_map, by = c("WD22NM" = "WardName")) %>%
     group_by(Ethnicity_Code, Financial_Year, LAD22CD, WD22CD, WD22NM, Locality, AgeBandCode, AgeBandCategory) %>%
     summarise(Numerator = as.numeric(sum(Numerator, na.rm = TRUE)), .groups = 'drop') %>%
     rename(Fiscal_Year = Financial_Year) %>%
     mutate(Fiscal_Year = str_replace(Fiscal_Year, "-", "/20"),
-           AggYear = 1) %>% 
+           AggYear = 1) %>%
     clean_names(case = "upper_camel", abbreviations = c("WD", "LAD", "CD", "NM", "ONS"))
-  
+
   # Get the aggregated numerator data for 3- and 5-year rolling periods
   aggregated_data <- create_aggregated_data(output, agg_years = c(3, 5), type = "numerator")
 
@@ -221,8 +234,11 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA) {
  
 # Example
 my_numerator <- get_numerator(indicator_data = indicator_data,
-                              indicator_id = 49,
-                              reference_id = 93229)
+                              indicator_id = 24,
+                              reference_id = 92302,
+                              min_age = 35,
+                              max_age = NA)
+
 
 ##4.3 Function 3: Create denominator dataset  ----------------------------------
 
@@ -232,15 +248,17 @@ my_numerator <- get_numerator(indicator_data = indicator_data,
 
 get_denominator <- function(pop_estimates, numerator_data){
   
-  
   # Map the population estimates to the unique Wards and LADs
   pop_estimates <- pop_estimates %>% 
+    # Ensures the denominator data contains the age-specific bands for the indicator 
+    filter(age_b_18_categories_code %in% unique(my_numerator$AgeBandCode)) %>% 
     inner_join(Ward_LAD_unique, 
                by = c("electoral_wards_and_divisions_code" = "WD22CD")) %>% 
     group_by(electoral_wards_and_divisions_code, electoral_wards_and_divisions,
              ethnic_group_20_categories_code, ethnic_group_20_categories, 
              age_b_18_categories_code,age_b_18_categories) %>% # Added age band codes & categories
     summarise(observation = sum(observation), .groups = 'drop') 
+  
   
   # Add the IMD quintiles by Ward
   imd_england_ward <- IMD::imd_england_ward %>%
@@ -569,12 +587,12 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
 
 # Example
 result <- calculate_age_std_rate(
-  indicator_id = 49,
+  indicator_id = 24,
   denominator_data = my_denominator,
   numerator_data = my_numerator,
   aggID = c( "LAD22CD"),
   genderGrp = "Persons",
-  ageGrp = "All ages",
+  ageGrp = "35+ yrs",
   multiplier = 100000
 )
 
