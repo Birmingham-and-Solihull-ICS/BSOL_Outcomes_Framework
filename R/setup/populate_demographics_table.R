@@ -20,7 +20,7 @@ agegrp <-  data.frame (
              "10+ yrs",
              "10-11 yrs",
              "10-24 yrs",
-             "0-17yrs",
+             "0-17 yrs",
              "1-17 yrs",
              "0-18 yrs",
              "12+ yrs",
@@ -34,11 +34,11 @@ agegrp <-  data.frame (
              "19+ yrs",
              "35+ yrs",
              "40-74 yrs",
-             "40-64",
+             "40-64 yrs",
              "53-70 yrs",
              "60-74 yrs",
              "65+ yrs",
-             "65",
+             "65 yrs",
              "<75 yrs",
              NA)
 )
