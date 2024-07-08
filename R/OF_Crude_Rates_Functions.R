@@ -205,10 +205,9 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
 
 # Example
 my_numerator <- get_numerator(indicator_data = indicator_data,
-                                   indicator_id = 11,
-                                   min_age = 65,
-                                   max_age = NA)
-
+                                   indicator_id = 117,
+                                   min_age = NA,
+                                   max_age = 74)
 
 ##4.3 Function 3: Create denominator dataset  ----------------------------------
 
@@ -280,11 +279,10 @@ get_denominator <- function(min_age = NA, max_age = NA, pop_estimates, numerator
 }
 
 # Example
-my_denominator <- get_denominator(min_age = 65,
-                                    max_age = NA,
+my_denominator <- get_denominator(min_age = NA,
+                                    max_age = 74,
                                     pop_estimates = popfile_ward, 
                                     numerator_data = my_numerator)
-
 
 #5. Crude Rates Calculation ----------------------------------------------------
 #5.1 Function 4: Calculate crude rates -----------------------------------------

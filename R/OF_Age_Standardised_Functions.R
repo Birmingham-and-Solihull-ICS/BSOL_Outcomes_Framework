@@ -40,6 +40,13 @@ ward_locality_map <- ward_locality_map %>%
          WardCode = AreaCode,
          WardName = AreaName)
 
+# Get unique pairs of Ward and Locality
+ward_locality_unique <- ward_locality_map %>% 
+  rename(WD22CD = WardCode,
+         WD22NM = WardName) %>% 
+  select(WD22CD, WD22NM, Locality) %>% 
+  distinct()
+
 ##2.3 Ethnicity code mapping ---------------------------------------------------
 ethnicity_map <- dbGetQuery(
   con,
@@ -343,10 +350,6 @@ get_grouping_columns <- function(rate_type) {
 # Helper function to summarize numerator and denominator data with the correct 'DataQualityID'
 get_summarized_data <- function(id, group_vars, year, denominator_data, numerator_data) {
   
-  # Get unique pairs of Wards and Localities
-  Localities_Ward_unique <- numerator_data %>% 
-    select(Locality, WD22CD, WD22NM) %>% 
-    distinct()
   
   summarized_data <- denominator_data %>%
     filter(AggYear == year) %>%
@@ -358,7 +361,7 @@ get_summarized_data <- function(id, group_vars, year, denominator_data, numerato
   
   if (id == "WD22NM") {
     summarized_data <- summarized_data %>%
-      left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+      left_join(ward_locality_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
       group_by(across(all_of(c(group_vars, "WD22NM.y"))))
   } else if (id == "LAD22CD") {
     summarized_data <- summarized_data %>%
@@ -366,7 +369,7 @@ get_summarized_data <- function(id, group_vars, year, denominator_data, numerato
       group_by(across(all_of(c(group_vars, "LAD22CD.y"))))
   } else if (id == "Locality") {
     summarized_data <- summarized_data %>%
-      left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+      left_join(ward_locality_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
       group_by(across(all_of(c(group_vars, "Locality.y"))))
   } else if (id == "BSOL ICB") {
     summarized_data <- summarized_data %>%
@@ -385,10 +388,6 @@ get_summarized_data <- function(id, group_vars, year, denominator_data, numerato
 # Main function to calculate age-standardised rate
 calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_data, aggID, genderGrp, ageGrp, multiplier = 100000) {
   
-  # Get unique pairs of Wards and Localities
-  Localities_Ward_unique <- numerator_data %>% 
-    select(Locality, WD22CD, WD22NM) %>% 
-    distinct()
 
   # Aggregation years to calculate age-standardised rates for 1, 3 and 5 rolling periods
   AggYears <- c(1, 3, 5)
@@ -413,7 +412,7 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
       # Conditional operations for different levels of aggregations
       if (id == "WD22NM") {
         joined_data <- joined_data %>%
-          left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+          left_join(ward_locality_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
           group_by(across(all_of(c(group_vars, "WD22NM.y")))) # Grouping by WD22NM.y
         
       } else if (id == "LAD22CD") {
@@ -423,7 +422,7 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
         
       } else if (id == "Locality") {
         joined_data <- joined_data %>%
-          left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+          left_join(ward_locality_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
           group_by(across(all_of(c(group_vars, "Locality.y")))) # Grouping by Locality.y
         
       } else if (id == "BSOL ICB") {
