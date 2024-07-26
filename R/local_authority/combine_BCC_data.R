@@ -46,7 +46,7 @@ for (i in 1:length(ids)) {
 OF_values <- bind_rows(dfs)
 
 # Save output
-writexl::write_xlsx(OF_values, "../data/output/birmingham-OF-data-24-05-24.xlsx")
+writexl::write_xlsx(OF_values, "../data/output/birmingham-OF-values-24-05-24.xlsx")
 
 
 
