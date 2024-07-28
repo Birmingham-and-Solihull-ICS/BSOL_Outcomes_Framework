@@ -394,7 +394,7 @@ ICB_HC_received <- BSol_data %>%
     LowerCI95 = 100 * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
     UpperCI95 = 1000 * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
     DemographicID = 82,
-    DataQualityID = 1,
+    DataQualityID = 2,
     # Calculate indicator start and end dates
     Year_Start = stringr::str_extract(year,"^(\\d{4})"),
     IndicatorStartDate = as.Date(sprintf("%s/04/01", Year_Start)) %m+% 
