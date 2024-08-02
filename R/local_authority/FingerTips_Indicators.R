@@ -66,7 +66,7 @@ process_LA_data <- function(FingerTips_id) {
       UpperCI95 = UpperCI95.0limit
       ) %>%
     select(
-      AreaName, Timeperiod, Count, Denominator, Value, LowerCI95, UpperCI95
+      AreaCode, Timeperiod, Count, Denominator, Value, LowerCI95, UpperCI95
     ) %>%
     mutate(
       magnitude = get_magnitude(meta),
@@ -75,11 +75,11 @@ process_LA_data <- function(FingerTips_id) {
   
   # England data
   df_eng <- data %>% 
-    filter(AreaName == "England")
+    filter(AreaCode == "E92000001")
   
   # Filter for Birmingham and Solihull
   df_LA <- data %>%
-    filter(AreaName %in% c("Solihull", "Birmingham"))
+    filter(AreaCode %in% c("E08000029", "E08000025"))
   
   # Filter for Birmingham and Solihull
   df_ICB <- df_LA %>%
@@ -90,7 +90,7 @@ process_LA_data <- function(FingerTips_id) {
       .groups = 'keep'
     ) %>%
     mutate(
-      AreaName = "BSOL ICB",
+      AreaCode = "E38000258",
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
@@ -108,7 +108,7 @@ process_LA_data <- function(FingerTips_id) {
     ) %>% 
     ungroup() %>%
     select(
-      AreaName, Timeperiod, Count, Denominator, Value, LowerCI95, UpperCI95, 
+      AreaCode, Timeperiod, Count, Denominator, Value, LowerCI95, UpperCI95, 
       magnitude, CI_method
     )
   
@@ -120,7 +120,12 @@ process_LA_data <- function(FingerTips_id) {
   ) %>% 
     select(-c(magnitude, CI_method))
   
-  return(combined_data)
+  output <- list(
+    "data" = combined_data,
+    "meta" = meta
+  )
+  
+  return(output)
 }
 
 process_GP_data <- function(FingerTips_id) {
@@ -302,21 +307,34 @@ process_GP_data <- function(FingerTips_id) {
   return(output)
 }
 
-
+all_data <- list()
+all_meta <- list()
 
 for (i in 1:nrow(ids)){
   
   if (ids$AreaType[i] == "GP") {
-    print("Process like GP")
+    data_i <- process_GP_data(ids$FingerTips_id[[i]])
   } 
   else if (ids$AreaType[i] == "LA") {
-    data_i <- process_LA_data(
-      ids$FingerTips_id[[i]], 
-      ids$AreaTypeID[[i]]
-    )
+    data_i <- process_LA_data(ids$FingerTips_id[[i]])
   }
   else {
     stop(error = "Unexpected AreaTypeID. Only GP (7) and LA (402) implemented.")
   }
-  data_i$IndicatorID <- ids$IndicatorID[[i]]
+  # Add in our indicator ID
+  data_i[["data"]]$IndicatorID <- ids$IndicatorID[[i]]
+  
+  # Store data for ID in list
+  all_data[[i]] <- data_i[["data"]]
+  all_meta[[i]] <- data_i[["meta"]] 
 }
+
+# Combine all indicator data and meta data
+collected_data <- rbindlist(all_data)
+collected_meta <- rbindlist(all_meta)
+
+# 
+# for (i in 1:5) {
+#   print(colnames(all_data[[i]]))
+#   print("")
+# }
