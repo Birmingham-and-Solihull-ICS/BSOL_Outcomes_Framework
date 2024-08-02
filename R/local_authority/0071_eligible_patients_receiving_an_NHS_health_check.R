@@ -9,7 +9,8 @@ problem_GPs <- c(
   "M85753",  # Closed
   "M85159",  # Closed
   "V9Y6R",   # Closed
-  "M88015",  # Sandwell
+  # (We pay Sandwell GPs below, but they're not registered to one of our PCNs)
+  "M88015",  # Sandwell 
   "M88006",  # Sandwell
   "M85782",  # University Southgate
   "M85801"   # No record in FT

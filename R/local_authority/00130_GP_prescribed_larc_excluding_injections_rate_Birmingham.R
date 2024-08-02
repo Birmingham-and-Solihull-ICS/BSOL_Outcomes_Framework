@@ -1,8 +1,9 @@
-IndicatorID = 23 
+IndicatorID = 130 
+DataQualityID = 2
 # DomainID =	3	
-# ReferenceID = 92254 (Actually 91819 since GP prescribed only)
+# ReferenceID = 91819 
 # ICBIndicatorTitle = Increase uptake of Long-acting reversible contraception	
-# IndicatorLabel = Total prescribed LARC excluding injections rate / 1,000
+# IndicatorLabel = GP prescribed LARC excluding injections rate / 1,000
 # (Birmingham GP data only)
 
 library(dplyr)
@@ -224,7 +225,7 @@ output_df <- rbind(
     ValueID = "",
     InsertDate = Sys.Date(),
     DemographicID = 1,
-    DataQualityID = 2,
+    DataQualityID = DataQualityID,
     IndicatorID = IndicatorID,
     Year_Start = stringr::str_extract(quarter,"\\d{2}"),
     quarter_number = as.numeric(stringr::str_extract(quarter,"\\d{1}")),
