@@ -243,7 +243,7 @@ output_df <- rbind(
     c("ValueID", "IndicatorID", "InsertDate", 
       "Numerator", "Denominator", "IndicatorValue","LowerCI95", "UpperCI95", 
       "AggregationID", "DemographicID", "DataQualityID",
-      "quarter", "IndicatorStartDate","IndicatorEndDate"
+      "IndicatorStartDate","IndicatorEndDate"
       )
   )
 

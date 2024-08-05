@@ -10,6 +10,12 @@ ids <- read.csv("../../data/LA_FingerTips_Indicators.csv")
 GP_lookup <- read.csv("../../data/better-GP-lookup-march-2024.csv") %>%
   select(-c(Type, PCN, Locality, LA))
 
+#################################################################
+##                        Functions                            ##
+#################################################################
+
+## Data collection functions ##
+
 fetch_data <- function(FingerTips_id, AreaTypeID) {
   # Fetch data from FingerTips using API
   data <- fingertips_data(
@@ -66,7 +72,8 @@ process_LA_data <- function(FingerTips_id) {
       UpperCI95 = UpperCI95.0limit
       ) %>%
     select(
-      AreaCode, Timeperiod, Count, Denominator, Value, LowerCI95, UpperCI95
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
+      LowerCI95, UpperCI95
     ) %>%
     mutate(
       magnitude = get_magnitude(meta),
@@ -83,7 +90,7 @@ process_LA_data <- function(FingerTips_id) {
   
   # Filter for Birmingham and Solihull
   df_ICB <- df_LA %>%
-    group_by(Timeperiod, magnitude, CI_method) %>%
+    group_by(Timeperiod,  Sex, Age, magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
       Denominator = sum(Denominator),
@@ -108,8 +115,8 @@ process_LA_data <- function(FingerTips_id) {
     ) %>% 
     ungroup() %>%
     select(
-      AreaCode, Timeperiod, Count, Denominator, Value, LowerCI95, UpperCI95, 
-      magnitude, CI_method
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
+      LowerCI95, UpperCI95, magnitude, CI_method
     )
   
   # 
@@ -143,7 +150,7 @@ process_GP_data <- function(FingerTips_id) {
       UpperCI95 = UpperCI95.0limit
     ) %>%
     select(
-      AreaCode, Timeperiod, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
       LowerCI95, UpperCI95
     ) %>%
     mutate(
@@ -155,7 +162,7 @@ process_GP_data <- function(FingerTips_id) {
   df_eng <- data %>% 
     filter(AreaCode == "E92000001") %>%
     select(
-      AreaCode, Timeperiod, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
       LowerCI95, UpperCI95, magnitude, CI_method
     )
   
@@ -163,7 +170,7 @@ process_GP_data <- function(FingerTips_id) {
   df_PCN <- data %>%
     inner_join(GP_lookup, 
                join_by(AreaCode == "Practice_Code")) %>%
-    group_by(PCN_Code, Timeperiod, magnitude, CI_method) %>%
+    group_by(PCN_Code, Timeperiod,  Sex, Age, magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
       Denominator = sum(Denominator),
@@ -188,7 +195,7 @@ process_GP_data <- function(FingerTips_id) {
     ) %>% 
     ungroup() %>%
     select(
-      AreaCode, Timeperiod, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
       LowerCI95, UpperCI95, magnitude, CI_method
     )
       
@@ -196,7 +203,7 @@ process_GP_data <- function(FingerTips_id) {
   df_Locality <- data %>%
     inner_join(GP_lookup, 
                join_by(AreaCode == "Practice_Code")) %>%
-    group_by(LA_Code, Timeperiod, magnitude, CI_method) %>%
+    group_by(LA_Code, Timeperiod, Sex, Age,  magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
       Denominator = sum(Denominator),
@@ -221,7 +228,7 @@ process_GP_data <- function(FingerTips_id) {
     ) %>% 
     ungroup() %>%
     select(
-      AreaCode, Timeperiod, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
       LowerCI95, UpperCI95, magnitude, CI_method
     )
 
@@ -229,7 +236,7 @@ process_GP_data <- function(FingerTips_id) {
   df_LA <- data %>%
     inner_join(GP_lookup, 
                join_by(AreaCode == "Practice_Code")) %>%
-    group_by(LA_Code, Timeperiod, magnitude, CI_method) %>%
+    group_by(LA_Code, Timeperiod, Sex, Age, magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
       Denominator = sum(Denominator),
@@ -254,7 +261,7 @@ process_GP_data <- function(FingerTips_id) {
     ) %>% 
     ungroup() %>%
     select(
-      AreaCode, Timeperiod, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
       LowerCI95, UpperCI95, magnitude, CI_method
     )
   
@@ -262,7 +269,7 @@ process_GP_data <- function(FingerTips_id) {
   df_ICB <- data %>%
     inner_join(GP_lookup, 
                join_by(AreaCode == "Practice_Code")) %>%
-    group_by(Timeperiod, magnitude, CI_method) %>%
+    group_by(Timeperiod, Sex, Age,  magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
       Denominator = sum(Denominator),
@@ -287,7 +294,7 @@ process_GP_data <- function(FingerTips_id) {
     ) %>% 
     ungroup() %>%
     select(
-      AreaCode, Timeperiod, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
       LowerCI95, UpperCI95, magnitude, CI_method
     )
   
@@ -306,6 +313,51 @@ process_GP_data <- function(FingerTips_id) {
   
   return(output)
 }
+
+## Data processing functions ##
+
+start_date <- function(date) {
+  
+  # If financial year e.g. 2021/22
+  if (grepl("^\\d{4}/\\d{2}$",date)) {
+    Year_Start = stringr::str_extract(date,"^\\d{4}")
+    start_date <- as.Date(sprintf("%s/04/01", Year_Start))
+  } 
+  # If calendar year e.g. 2021
+  else if (grepl("^\\d{4}$",date)) {
+    start_date <- as.Date(sprintf("%s/01/01", date))
+  }
+  # Otherwise raise error
+  else{
+    stop(error = "Can't convert date. Unexpected format for TimePeriod.")
+  }
+  return(start_date)
+}
+
+end_date <- function(date) {
+  
+  # If financial year e.g. 2021/22
+  if (grepl("^\\d{4}/\\d{2}$",date)) {
+    Year_Start = stringr::str_extract(date,"^\\d{4}")
+    start_date <- as.Date(sprintf("%i/03/31", as.numeric(Year_Start) + 1 ))
+  } 
+  # If calendar year e.g. 2021
+  else if (grepl("^\\d{4}$",date)) {
+    start_date <- as.Date(sprintf("%s/12/31", date))
+  }
+  # Otherwise raise error
+  else{
+    stop(error = "Can't convert date. Unexpected format for TimePeriod.")
+  }
+  return(start_date)
+}
+
+print(end_date("2015"))
+
+#################################################################
+##                Collect Data from FingerTips                 ##
+#################################################################
+
 
 all_data <- list()
 all_meta <- list()
@@ -333,8 +385,23 @@ for (i in 1:nrow(ids)){
 collected_data <- rbindlist(all_data)
 collected_meta <- rbindlist(all_meta)
 
-# 
-# for (i in 1:5) {
-#   print(colnames(all_data[[i]]))
-#   print("")
-# }
+#################################################################
+##                Mutate into Staging Table                    ##
+#################################################################
+
+output_data <- collected_data %>%
+  mutate(
+    ValueID = "",
+    # Calculate start and end dates
+    IndicatorStartDate = as.Date(sapply(Timeperiod, start_date)),
+    IndicatorEndDate = as.Date(sapply(Timeperiod, end_date)),
+    # Set insert date to today
+    InsertDate = Sys.Date(),
+    # No data quality issues since all FingerTips data
+    DataQualityID = 1
+  )
+  
+
+
+
+
