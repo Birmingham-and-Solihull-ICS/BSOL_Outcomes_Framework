@@ -25,7 +25,18 @@ fetch_data <- function(FingerTips_id, AreaTypeID) {
   
   meta_data <- indicator_metadata(
     IndicatorID = FingerTips_id
-  )
+  ) %>%
+    mutate(
+      `Source of numerator` = `Source of numerator...10`,
+      `Source of denominator`  = `Source of denominator...12`,
+      `External Reference` = Links,
+      `Rate Type` = `Value type`,
+    ) %>%
+    select(
+      c(Caveats, `Definition of denominator`, `Definition of numerator`,
+        `External Reference`, Polarity, `Simple Definition`,
+        `Source of numerator`, `Source of denominator`, Unit, Methodology)
+    )
   
   return(
     list("data" = data,"meta" = meta_data)
@@ -373,7 +384,8 @@ for (i in 1:nrow(ids)){
   }
   # Add in our indicator ID
   data_i[["data"]]$IndicatorID <- ids$IndicatorID[[i]]
-  
+  data_i[["meta"]]$IndicatorID <- ids$IndicatorID[[i]]  
+
   # Store data for ID in list
   all_data[[i]] <- data_i[["data"]]
   all_meta[[i]] <- data_i[["meta"]] 
@@ -387,6 +399,8 @@ collected_meta <- rbindlist(all_meta)
 ##                Mutate into Staging Table                    ##
 #################################################################
 
+# Load ID lookup tables
+
 demographics <- readxl::read_excel(
   "../../data/OF-Other-Tables.xlsx",
   sheet = "Demographic"
@@ -398,6 +412,13 @@ aggregations <- readxl::read_excel(
   sheet = "Aggregation"
 ) %>% 
   select(c(AggregationID,	AggregationCode))
+
+meta <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Meta"
+)
+
+# Process value data
 
 output_data <- collected_data %>%
   filter(
@@ -436,3 +457,33 @@ output_data <- collected_data %>%
       "IndicatorStartDate","IndicatorEndDate"
     )
   )
+
+# Process meta data
+
+output_meta <- collected_meta %>%
+  select(-c(Unit, Methodology)) %>%
+  tidyr::pivot_longer(
+    cols=-IndicatorID,
+    names_to='ItemLabel',
+    values_to='MetaValue') %>%
+  left_join(
+    meta,
+    join_by(ItemLabel)) %>%
+  select(c(IndicatorID,ItemID,MetaValue))
+
+#################################################################
+##                     Save final output                       ##
+#################################################################
+
+# Save data
+write.csv(
+  output_data, 
+  "../../data/output/birmingham-source/LA_FingerTips_data.csv"
+  )
+
+# Save meta
+
+write.csv(
+  output_meta, 
+  "../../data/output/birmingham-source/LA_FingerTips_meta.csv"
+)
