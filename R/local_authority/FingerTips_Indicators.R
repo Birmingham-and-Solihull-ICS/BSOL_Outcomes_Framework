@@ -352,8 +352,6 @@ end_date <- function(date) {
   return(start_date)
 }
 
-print(end_date("2015"))
-
 #################################################################
 ##                Collect Data from FingerTips                 ##
 #################################################################
@@ -389,7 +387,23 @@ collected_meta <- rbindlist(all_meta)
 ##                Mutate into Staging Table                    ##
 #################################################################
 
+demographics <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Demographic"
+) %>% 
+  select(c(DemographicID, DemographicLabel))
+
+aggregations <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Aggregation"
+) %>% 
+  select(c(AggregationID,	AggregationCode))
+
 output_data <- collected_data %>%
+  filter(
+    # Remove rows with no data
+    !is.na(Value)
+  ) %>%
   mutate(
     ValueID = "",
     # Calculate start and end dates
@@ -398,10 +412,27 @@ output_data <- collected_data %>%
     # Set insert date to today
     InsertDate = Sys.Date(),
     # No data quality issues since all FingerTips data
-    DataQualityID = 1
+    DataQualityID = 1,
+    # Stitch together demographics
+    DemographicLabel = paste(Sex, ": ", Age, sep = ""),
+    # Change column names
+    Numerator = Count,
+    IndicatorValue = Value
+  ) %>%
+  left_join(
+    demographics,
+    join_by(DemographicLabel),
+    relationship = "many-to-one"
+  ) %>%
+  left_join(
+    aggregations,
+    join_by(AreaCode == "AggregationCode"),
+    relationship = "many-to-one"
+  ) %>%
+  select(
+    c("ValueID", "IndicatorID", "InsertDate", 
+      "Numerator", "Denominator", "IndicatorValue","LowerCI95", "UpperCI95", 
+      "AggregationID", "DemographicID", "DataQualityID",
+      "IndicatorStartDate","IndicatorEndDate"
+    )
   )
-  
-
-
-
-

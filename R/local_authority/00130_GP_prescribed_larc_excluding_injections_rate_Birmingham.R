@@ -219,7 +219,7 @@ output_df <- rbind(
   LARC_PCN,
   LARC_Locality,
   LARC_Birmingham
-) %>%
+)  %>%
   mutate(
     # Create empty columns for unknown values/IDs
     ValueID = "",
@@ -245,7 +245,8 @@ output_df <- rbind(
       "AggregationID", "DemographicID", "DataQualityID",
       "IndicatorStartDate","IndicatorEndDate"
       )
-  )
+  ) 
+  
 
 # Save output
 write.csv(output_df, "../../data/output/birmingham-source/0023_total_prescribed_larc_excluding_injections_rate.csv")
