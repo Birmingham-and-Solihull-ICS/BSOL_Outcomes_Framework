@@ -1,25 +1,23 @@
 # Combine BCC data
+library(dplyr)
+
+#################################################################
+###                   Combine Value Data                      ###
+#################################################################
 
 # Get paths to all BCC data files
-path <- "../../data/output/birmingham-source/"
+path <- "../../data/output/birmingham-source/data/"
 file_paths <- paste(path, list.files(path), sep = "")
-
-# Get ids
-ids <- unlist(lapply(list.files(path), substr, 1, 4))
 
 # Load data
 dfs <- lapply(file_paths, read.csv)
 
-# OF Aggregation look-up
-OF_aggs <- readxl::read_excel(
-  "../../data/OF-Other-Tables.xlsx", sheet = "Aggregation"
-)
-
-for (i in 1:length(ids)) {
-  print(ids[[i]])
+for (i in 1:length(dfs)) {
   
+  id_i <- unique(dfs[[i]]$IndicatorID)
+  print(id_i)
   # Fix demographicID for NDTMS indicators
-  if (ids[[i]] %in% c("0118", "0119")) {
+   if (id_i[[1]] == 118 | id_i[[1]] == 119) {
     dfs[[i]] <- dfs[[i]] %>%
       mutate(
         DemographicID = case_when(
@@ -32,25 +30,71 @@ for (i in 1:length(ids)) {
           DemographicID == "50+" ~ NA,
           TRUE ~ NA
         ),
-        DataQualityID = 1
+        DataQualityID = 1,
+        InsertDate = "2024-04-30"
       )
   }
-
+  
   # select and reorder columns so they match
   dfs[[i]] <- dfs[[i]] %>%
+    mutate(
+      # Standardise insert date formats
+      InsertDate = case_when(
+        grepl("\\d{2}/\\d{2}/\\d{4}", InsertDate) ~ as.Date(InsertDate, fmt = "%d/%m/%Y"),
+        grepl("\\d{4}-\\d{2}-\\d{2}", InsertDate) ~ as.Date(InsertDate),
+        TRUE ~ NA
+      )
+      ) %>%
     select(c("ValueID", "IndicatorID", "InsertDate", "Numerator", "Denominator",       
              "IndicatorValue", "LowerCI95", "UpperCI95", "AggregationID", 
              "DemographicID", "DataQualityID", "IndicatorStartDate", "IndicatorEndDate" ))
-  }
+  
+}
 
 # Combine dfs
 OF_values <- bind_rows(dfs)
 # Remove any value IDs
-OF_values$ValueID = ""
+OF_values$ValueID = NA
 
+# look at level of missing data
+OF_values %>% summarise(across(everything(), ~ sum(is.na(.))))
+
+data_save_name <- sprintf(
+  "../../data/output/birmingham-OF-values-%s.csv",
+  as.character(Sys.Date())
+)
+
+print(paste("Saving data as:", data_save_name))
 # Save output
-write.csv(OF_values, "../../data/output/birmingham-OF-values-28-07-24.csv",
+write.csv(OF_values, 
+          data_save_name,
           row.names = FALSE)
 
 
+#################################################################
+###                   Combine meta Data                      ###
+#################################################################
 
+# Get paths to all BCC data files
+meta_path <- "../../data/output/birmingham-source/meta/"
+meta_file_paths <- paste(meta_path, list.files(meta_path), sep = "")
+
+# Load data
+meta_dfs <- lapply(meta_file_paths, read.csv)
+
+# Combine dfs
+OF_meta <- bind_rows(meta_dfs)
+
+# look at level of missing data
+OF_meta %>% summarise(across(everything(), ~ sum(is.na(.))))
+
+meta_save_name <- sprintf(
+  "../../data/output/birmingham-OF-meta-%s.csv",
+  as.character(Sys.Date())
+)
+
+print(paste("Saving meta as:", data_save_name))
+# Save OF_meta
+write.csv(OF_values, 
+          meta_save_name,
+          row.names = FALSE)
