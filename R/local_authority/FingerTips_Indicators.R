@@ -70,7 +70,7 @@ get_CI_method <- function(meta) {
 
 process_LA_data <- function(FingerTips_id) {
   
-  data_and_meta <- fetch_data(FingerTips_id, AreaTypeID = 402)
+  data_and_meta <- fetch_data(FingerTips_id, AreaTypeID = 502)
   data <- data_and_meta[["data"]]
   meta <- data_and_meta[["meta"]]
   # delete list to save space
@@ -380,7 +380,7 @@ for (i in 1:nrow(ids)){
     data_i <- process_LA_data(ids$FingerTips_id[[i]])
   }
   else {
-    stop(error = "Unexpected AreaTypeID. Only GP (7) and LA (402) implemented.")
+    stop(error = "Unexpected AreaTypeID. Only GP (7) and LA (502) implemented.")
   }
   # Add in our indicator ID
   data_i[["data"]]$IndicatorID <- ids$IndicatorID[[i]]
@@ -478,14 +478,14 @@ output_meta <- collected_meta %>%
 # Save data
 write.csv(
   output_data, 
-  "../../data/output/birmingham-source/LA_FingerTips_data.csv"
+  "../../data/output/birmingham-source/data/LA_FingerTips_data.csv"
   )
 
 # Save meta
 
 write.csv(
   output_meta, 
-  "../../data/output/birmingham-source/LA_FingerTips_meta.csv"
+  "../../data/output/birmingham-source/meta/LA_FingerTips_meta.csv"
 )
 
 

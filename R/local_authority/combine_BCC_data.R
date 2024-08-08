@@ -72,7 +72,7 @@ write.csv(OF_values,
 
 
 #################################################################
-###                   Combine meta Data                      ###
+###                   Combine meta Data                       ###
 #################################################################
 
 # Get paths to all BCC data files
@@ -98,3 +98,19 @@ print(paste("Saving meta as:", data_save_name))
 write.csv(OF_values, 
           meta_save_name,
           row.names = FALSE)
+
+#################################################################
+###                    Additional Checks                      ###
+#################################################################
+
+# Check that we have meta for all values
+value_IndicatorIDs <- sort(unique(OF_values$IndicatorID))
+meta_IndicatorIDs <- sort(unique(OF_meta$IndicatorID))
+
+ID_match_check1 <- all(meta_IndicatorIDs %in% value_IndicatorIDs)
+ID_match_check2 <- all(value_IndicatorIDs %in% meta_IndicatorIDs)
+if (!(ID_match_check1 & ID_match_check2)) {
+  stop("Value and meta IDs do not match!")
+} else{
+  print("Value and meta IDs match: True")
+}
