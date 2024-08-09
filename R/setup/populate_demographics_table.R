@@ -174,6 +174,20 @@ demo_table %>%  distinct() %>%  count()
 # demo_table %>% 
 #   select(DemographicID, Label, Gender, AgeGrp, IMD, Ethnicity)
 
+
+# Manuel addition for NDTMS indicators.  Appended to not mess up previous order and keys.
+# Manually added to SQL server, but included here for rebuild.
+
+ndtms_age <- c("18-29 yrs", "30-49 yrs", "50+ yrs")
+
+ndtms_append <-
+  data.frame(DemographicLabel = paste0("Persons: ", ndtms_age)
+             , Gender = "Persons"
+             , AgeGrp = ndtms_age
+             , IMD = NA
+             , Ethnicity = NA)
+
+
 library(DBI)
 con <- dbConnect(odbc::odbc(), .connection_string = "Driver={SQL Server};server=MLCSU-BI-SQL;database=EAT_Reporting_BSOL", 
                  timeout = 10)
