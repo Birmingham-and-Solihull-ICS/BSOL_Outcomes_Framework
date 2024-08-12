@@ -86,6 +86,9 @@ meta_dfs <- lapply(meta_file_paths, read.csv)
 # Combine dfs
 OF_meta <- bind_rows(meta_dfs)
 
+# Remove all HTML tags
+OF_meta$MetaValue <- gsub("<.*?>", "", OF_meta$MetaValue)
+
 # look at level of missing data
 missing_meta_check <- OF_meta %>% summarise(across(everything(), ~ sum(is.na(.))))
 
