@@ -57,7 +57,7 @@ OF_values$ValueID = NA
 
 # look at level of missing data
 missing_data_check <- OF_values %>% summarise(across(everything(), ~ sum(is.na(.))))
-
+cat("Value missing data check:")
 print(missing_data_check)
 
 data_save_name <- sprintf(
@@ -65,7 +65,7 @@ data_save_name <- sprintf(
   as.character(Sys.Date())
 )
 
-print(paste("Saving data as:", data_save_name))
+cat(paste("\nSaving data as:", data_save_name))
 # Save output
 write.csv(OF_values, 
           data_save_name,
@@ -90,8 +90,8 @@ OF_meta <- bind_rows(meta_dfs)
 OF_meta$MetaValue <- gsub("<.*?>", "", OF_meta$MetaValue)
 
 # look at level of missing data
+cat("\nMeta missing data check:")
 missing_meta_check <- OF_meta %>% summarise(across(everything(), ~ sum(is.na(.))))
-
 print(missing_meta_check)
 
 meta_save_name <- sprintf(
@@ -99,7 +99,7 @@ meta_save_name <- sprintf(
   as.character(Sys.Date())
 )
 
-print(paste("Saving meta as:", data_save_name))
+cat(paste("\nSaving meta as:", data_save_name))
 # Save OF_meta
 write.csv(OF_meta, 
           meta_save_name,
@@ -118,8 +118,8 @@ ID_match_check2 <- all(value_IndicatorIDs %in% meta_IndicatorIDs)
 if (!(ID_match_check1 & ID_match_check2)) {
   stop("Value and meta IDs do not match!")
 } else{
-  print("Value and meta IDs match: True")
-  print("Indicator IDs in final output:")
-  print(value_IndicatorIDs)
+  cat("\nValue and meta IDs match: True")
+  cat("Indicator IDs in final output:")
+  cat(value_IndicatorIDs)
 }
 
