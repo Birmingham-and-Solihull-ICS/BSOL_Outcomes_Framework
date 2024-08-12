@@ -15,7 +15,6 @@ dfs <- lapply(file_paths, read.csv)
 for (i in 1:length(dfs)) {
   
   id_i <- unique(dfs[[i]]$IndicatorID)
-  print(id_i)
   # Fix demographicID for NDTMS indicators
    if (id_i[[1]] == 118 | id_i[[1]] == 119) {
     dfs[[i]] <- dfs[[i]] %>%
@@ -25,9 +24,9 @@ for (i in 1:length(dfs)) {
           DemographicID == "Female" ~ 2,
           DemographicID == "Persons" ~ 1,     
           # NAs will be replaced with ID values later
-          DemographicID == "18-29" ~ NA,
-          DemographicID == "30-49" ~ NA,
-          DemographicID == "50+" ~ NA,
+          DemographicID == "18-29" ~ 7404,
+          DemographicID == "30-49" ~ 7405,
+          DemographicID == "50+" ~ 7406,
           TRUE ~ NA
         ),
         DataQualityID = 1,
@@ -57,7 +56,9 @@ OF_values <- bind_rows(dfs)
 OF_values$ValueID = NA
 
 # look at level of missing data
-OF_values %>% summarise(across(everything(), ~ sum(is.na(.))))
+missing_data_check <- OF_values %>% summarise(across(everything(), ~ sum(is.na(.))))
+
+print(missing_data_check)
 
 data_save_name <- sprintf(
   "../../data/output/birmingham-OF-values-%s.csv",
@@ -86,7 +87,9 @@ meta_dfs <- lapply(meta_file_paths, read.csv)
 OF_meta <- bind_rows(meta_dfs)
 
 # look at level of missing data
-OF_meta %>% summarise(across(everything(), ~ sum(is.na(.))))
+missing_meta_check <- OF_meta %>% summarise(across(everything(), ~ sum(is.na(.))))
+
+print(missing_meta_check)
 
 meta_save_name <- sprintf(
   "../../data/output/birmingham-OF-meta-%s.csv",
@@ -95,7 +98,7 @@ meta_save_name <- sprintf(
 
 print(paste("Saving meta as:", data_save_name))
 # Save OF_meta
-write.csv(OF_values, 
+write.csv(OF_meta, 
           meta_save_name,
           row.names = FALSE)
 
@@ -113,4 +116,7 @@ if (!(ID_match_check1 & ID_match_check2)) {
   stop("Value and meta IDs do not match!")
 } else{
   print("Value and meta IDs match: True")
+  print("Indicator IDs in final output:")
+  print(value_IndicatorIDs)
 }
+

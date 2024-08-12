@@ -475,6 +475,12 @@ output_meta <- collected_meta %>%
 ##                     Save final output                       ##
 #################################################################
 
+# Filter out irregular indicator demographic
+output_data <- output_data %>%
+  filter(
+    !(is.na(DemographicID) & IndicatorID == 47)
+  )
+
 # Save data
 write.csv(
   output_data, 
@@ -482,7 +488,6 @@ write.csv(
   )
 
 # Save meta
-
 write.csv(
   output_meta, 
   "../../data/output/birmingham-source/meta/LA_FingerTips_meta.csv"
