@@ -332,11 +332,15 @@ start_date <- function(date) {
   # If financial year e.g. 2021/22
   if (grepl("^\\d{4}/\\d{2}$",date)) {
     Year_Start = stringr::str_extract(date,"^\\d{4}")
-    start_date <- as.Date(sprintf("%s/04/01", Year_Start))
+    start_date <- as.Date(
+      sprintf("%s/04/01", Year_Start),
+      format = "%Y/%m/%d")
   } 
   # If calendar year e.g. 2021
   else if (grepl("^\\d{4}$",date)) {
-    start_date <- as.Date(sprintf("%s/01/01", date))
+    start_date <- as.Date(
+      sprintf("%s/01/01", date),
+      format = "%Y/%m/%d")
   }
   # Otherwise raise error
   else{
@@ -350,11 +354,15 @@ end_date <- function(date) {
   # If financial year e.g. 2021/22
   if (grepl("^\\d{4}/\\d{2}$",date)) {
     Year_Start = stringr::str_extract(date,"^\\d{4}")
-    start_date <- as.Date(sprintf("%i/03/31", as.numeric(Year_Start) + 1 ))
+    start_date <- as.Date(
+      sprintf("%i/03/31", as.numeric(Year_Start) + 1 ),
+      format = "%Y/%m/%d")
   } 
   # If calendar year e.g. 2021
   else if (grepl("^\\d{4}$",date)) {
-    start_date <- as.Date(sprintf("%s/12/31", date))
+    start_date <- as.Date(
+      sprintf("%s/12/31", date), 
+      format = "%Y/%m/%d")
   }
   # Otherwise raise error
   else{

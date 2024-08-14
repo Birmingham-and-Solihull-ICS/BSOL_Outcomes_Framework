@@ -123,3 +123,5 @@ if (!(ID_match_check1 & ID_match_check2)) {
   cat(value_IndicatorIDs)
 }
 
+# TODO: Add check sense check on confidence intervals
+
