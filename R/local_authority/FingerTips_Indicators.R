@@ -112,16 +112,16 @@ process_LA_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -192,16 +192,16 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -225,16 +225,16 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -258,16 +258,16 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -291,16 +291,16 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -467,8 +467,10 @@ output_data <- collected_data %>%
   )
 
 # Process meta data
-
 output_meta <- collected_meta %>%
+  mutate(
+    `Rate Type` = NA
+  ) %>%
   select(-c(Unit, Methodology)) %>%
   tidyr::pivot_longer(
     cols=-IndicatorID,
