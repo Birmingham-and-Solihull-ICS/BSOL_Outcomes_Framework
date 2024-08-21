@@ -4,7 +4,9 @@ library(data.table)
 library(readxl)
 
 # Load indicator list
-ids <- read.csv("../../data/LA_FingerTips_Indicators.csv")
+ids <- read_excel(
+  "../../data/LA_FingerTips_Indicators.xlsx",
+  sheet = "FT_indicators")
 
 # Load GP-PCN-Locality-LA lookup data
 GP_lookup <- read.csv("../../data/better-GP-lookup-march-2024.csv") %>%
@@ -16,13 +18,7 @@ GP_lookup <- read.csv("../../data/better-GP-lookup-march-2024.csv") %>%
 
 ## Data collection functions ##
 
-fetch_data <- function(FingerTips_id, AreaTypeID) {
-  # Fetch data from FingerTips using API
-  data <- fingertips_data(
-    AreaTypeID = AreaTypeID, 
-    IndicatorID = FingerTips_id
-  )
-  
+fetch_meta <- function(FingerTips_id) {
   meta_data <- indicator_metadata(
     IndicatorID = FingerTips_id
   ) %>%
@@ -35,8 +31,19 @@ fetch_data <- function(FingerTips_id, AreaTypeID) {
     select(
       c(Caveats, `Definition of denominator`, `Definition of numerator`,
         `External Reference`, Polarity, `Simple Definition`,
-        `Source of numerator`, `Source of denominator`, Unit, Methodology)
+        `Source of numerator`, `Source of denominator`, Unit, Methodology,
+        `Value type`)
     )
+  return(meta_data)
+}
+
+fetch_data <- function(FingerTips_id, AreaTypeID) {
+  # Fetch data from FingerTips using API
+  data <- fingertips_data(
+    AreaTypeID = AreaTypeID, 
+    IndicatorID = FingerTips_id
+  )
+  meta_data <- fetch_meta(FingerTips_id)
   
   return(
     list("data" = data,"meta" = meta_data)
@@ -60,11 +67,13 @@ get_CI_method <- function(meta) {
   # Estimate the confidence interval method based on the methodology
   #   - Rates -> Byar's Method
   #   - Otherwise -> Wilson's
-  methodology = meta %>% pull("Methodology")
-  if (grepl("rate", tolower(methodology))) {
+  Value_type = meta %>% pull("Value type")
+  if (grepl("rate", tolower(Value_type))) {
     return("Byar's Method")
-  } else{
+  } else if (grepl("proportion", tolower(Value_type))){
     return("Wilson's Method")
+  } else {
+    stop(sprintf("Unexpected Value Type: %s",Value_type))
   }
 }
 
@@ -404,6 +413,75 @@ collected_data <- rbindlist(all_data)
 collected_meta <- rbindlist(all_meta)
 
 #################################################################
+##               Collect Additional Meta Data                  ##
+#################################################################
+
+meta_ids <- ids <- read_excel(
+  "../../data/LA_FingerTips_Indicators.xlsx",
+  sheet = "meta_only")
+# Get additional meta data
+additional_meta_list <- list()
+
+for (i in 1:nrow(meta_ids)) {
+  meta_data_i <- fetch_meta(meta_ids$FingerTips_ID[[i]])
+  meta_data_i$IndicatorID <- ids$IndicatorID[[i]]
+  additional_meta_list[[i]] <- meta_data_i
+}
+
+collected_additional_meta <- rbindlist(additional_meta_list) %>%
+  mutate(
+    `Rate Type` = NA
+  ) %>%
+  select(-c(Unit, Methodology, `Value type`))
+
+meta <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Meta"
+)
+
+additional_meta <- collected_additional_meta %>%
+  tidyr::pivot_longer(
+    cols=-IndicatorID,
+    names_to='ItemLabel',
+    values_to='MetaValue') %>%
+  left_join(
+    meta,
+    join_by(ItemLabel)) %>%
+  select(c(IndicatorID,ItemID,MetaValue)) %>%
+  arrange(IndicatorID, ItemID)
+
+##  Amend meta data
+
+mask = (additional_meta$ItemID == 1 & additional_meta$IndicatorID == 130)
+additional_meta$MetaValue[mask] = paste("Solihull data currently unavailable.", additional_meta$MetaValue[mask])
+
+# ID 118 numerator definition
+mask = (additional_meta$ItemID == 2 & additional_meta$IndicatorID == 118) 
+additional_meta$MetaValue[mask] = "The number of deaths among adults in drug treatment in the local authority."
+# ID 118 denominator definition
+mask = (additional_meta$ItemID == 3 & additional_meta$IndicatorID == 118) 
+additional_meta$MetaValue[mask] = "The number of adults in drug treatment in the local authority."
+# ID 118 polarity
+mask = (additional_meta$ItemID == 5 & additional_meta$IndicatorID == 118) 
+additional_meta$MetaValue[mask] = "Low is good."
+# ID 118 rate type
+mask = (additional_meta$ItemID == 6 & additional_meta$IndicatorID == 118) 
+additional_meta$MetaValue[mask] = "Rate per 1,000"
+
+# ID 119 numerator definition
+mask = (additional_meta$ItemID == 2 & additional_meta$IndicatorID == 119) 
+additional_meta$MetaValue[mask] = "The number of deaths among adults in alcohol treatment in the local authority."
+# ID 119 denominator definition
+mask = (additional_meta$ItemID == 3 & additional_meta$IndicatorID == 119) 
+additional_meta$MetaValue[mask] = "The number of adults in alcohol treatment in the local authority."
+# ID 119 polarity
+mask = (additional_meta$ItemID == 5 & additional_meta$IndicatorID == 119) 
+additional_meta$MetaValue[mask] = "Low is good."
+# ID 119 rate type
+mask = (additional_meta$ItemID == 6 & additional_meta$IndicatorID == 119) 
+additional_meta$MetaValue[mask] = "Rate per 1,000"
+
+#################################################################
 ##                Mutate into Staging Table                    ##
 #################################################################
 
@@ -471,7 +549,7 @@ output_meta <- collected_meta %>%
   mutate(
     `Rate Type` = NA
   ) %>%
-  select(-c(Unit, Methodology)) %>%
+  select(-c(Unit, Methodology, `Value type`)) %>%
   tidyr::pivot_longer(
     cols=-IndicatorID,
     names_to='ItemLabel',
@@ -479,7 +557,9 @@ output_meta <- collected_meta %>%
   left_join(
     meta,
     join_by(ItemLabel)) %>%
-  select(c(IndicatorID,ItemID,MetaValue))
+  select(c(IndicatorID,ItemID,MetaValue)) %>%
+  rbind(additional_meta) %>%
+  arrange(IndicatorID, ItemID)
 
 #################################################################
 ##                     Save final output                       ##

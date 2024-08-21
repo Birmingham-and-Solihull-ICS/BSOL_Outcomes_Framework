@@ -1,5 +1,6 @@
 # Combine BCC data
 library(dplyr)
+library(readr)
 
 #################################################################
 ###                   Combine Value Data                      ###
@@ -74,7 +75,8 @@ meta_file_paths <- paste(meta_path, list.files(meta_path), sep = "")
 meta_dfs <- lapply(meta_file_paths, read.csv)
 
 # Combine dfs
-OF_meta <- bind_rows(meta_dfs)
+OF_meta <- bind_rows(meta_dfs) %>%
+  select(-c("X"))
 
 # Remove all HTML tags
 OF_meta$MetaValue <- gsub("<.*?>", "", OF_meta$MetaValue)
@@ -89,7 +91,6 @@ OF_meta$MetaValue <- gsub("<.*?>", "", OF_meta$MetaValue)
 missing_data_check <- OF_values %>% summarise(across(everything(), ~ sum(is.na(.))))
 cat("Value missing data check:\n")
 print(missing_data_check)
-
 
 # look at level of missing data
 cat("\nMeta missing data check:\n")
@@ -124,6 +125,14 @@ if (min(OF_values$IndicatorStartDate) < as.Date("01/01/2000")) {
   stop("Maximum dates is in the future.")
 }
 
+# Check that each indicator has a definition 
+OF_meta %>%
+  filter(ItemID==7 & is.na(MetaValue)) %>%
+  select(
+    c(IndicatorID)
+  ) %>% 
+  arrange(IndicatorID)
+
 #################################################################
 ###                      Save Data                            ###
 #################################################################
@@ -135,9 +144,8 @@ data_save_name <- sprintf(
 
 cat(paste("\nSaving data as:", data_save_name))
 # Save output
-write.csv(OF_values, 
-          data_save_name,
-          row.names = FALSE)
+write_csv(OF_values, 
+          data_save_name)
 
 meta_save_name <- sprintf(
   "../../data/output/birmingham-OF-meta-%s.csv",
@@ -146,8 +154,7 @@ meta_save_name <- sprintf(
 
 cat(paste("\nSaving meta as:", meta_save_name))
 # Save OF_meta
-write.csv(OF_meta, 
-          meta_save_name,
-          row.names = FALSE)
+write_csv(OF_meta, 
+          meta_save_name)
 
 
