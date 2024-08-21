@@ -92,6 +92,18 @@ missing_data_check <- OF_values %>% summarise(across(everything(), ~ sum(is.na(.
 cat("Value missing data check:\n")
 print(missing_data_check)
 
+# Print any problem IDs
+for (col in colnames(missing_data_check)[2:13]) {
+  if (missing_data_check[col] > 0) {
+    problemIDs <- OF_values %>%
+      select(c(IndicatorID, !!as.symbol(col))) %>%
+      filter(is.na(!!as.symbol(col))) %>%
+      distinct() %>%
+      pull(IndicatorID)
+    print(sprintf("%s missing for IndicatorIDs: %s", col, list(problemIDs)))
+  }
+}
+
 # look at level of missing data
 cat("\nMeta missing data check:\n")
 missing_meta_check <- OF_meta %>% summarise(across(everything(), ~ sum(is.na(.))))
@@ -126,12 +138,20 @@ if (min(OF_values$IndicatorStartDate) < as.Date("01/01/2000")) {
 }
 
 # Check that each indicator has a definition 
-OF_meta %>%
+missing_definition <- OF_meta %>%
   filter(ItemID==7 & is.na(MetaValue)) %>%
   select(
     c(IndicatorID)
   ) %>% 
-  arrange(IndicatorID)
+  arrange(IndicatorID) %>%
+  distinct() %>%
+  pull(IndicatorID)
+
+if (length(missing_definition) > 0) {
+  print(
+    sprintf("Definition missing for IndicatorIDs: %s", list(missing_definition))
+  )
+}
 
 #################################################################
 ###                      Save Data                            ###

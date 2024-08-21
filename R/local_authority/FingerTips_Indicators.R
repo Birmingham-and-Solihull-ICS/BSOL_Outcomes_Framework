@@ -27,6 +27,10 @@ fetch_meta <- function(FingerTips_id) {
       `Source of denominator`  = `Source of denominator...12`,
       `External Reference` = Links,
       `Rate Type` = `Value type`,
+      `Simple Definition` = case_when(
+        is.na(`Simple Definition`) ~ Definition,
+        TRUE ~ `Simple Definition`
+      ),
     ) %>%
     select(
       c(Caveats, `Definition of denominator`, `Definition of numerator`,
