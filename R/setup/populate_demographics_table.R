@@ -20,7 +20,7 @@ agegrp <-  data.frame (
              "10+ yrs",
              "10-11 yrs",
              "10-24 yrs",
-             "0-17yrs",
+             "0-17 yrs",
              "1-17 yrs",
              "0-18 yrs",
              "12+ yrs",
@@ -34,11 +34,11 @@ agegrp <-  data.frame (
              "19+ yrs",
              "35+ yrs",
              "40-74 yrs",
-             "40-64",
+             "40-64 yrs",
              "53-70 yrs",
              "60-74 yrs",
              "65+ yrs",
-             "65",
+             "65 yrs",
              "<75 yrs",
              NA)
 )
@@ -174,6 +174,153 @@ demo_table %>%  distinct() %>%  count()
 # demo_table %>% 
 #   select(DemographicID, Label, Gender, AgeGrp, IMD, Ethnicity)
 
+
+##########################################################################################
+
+# Manual addition for NDTMS indicators.  Appended to not mess up previous order and keys.
+# Manually added to SQL server, but included here for rebuild.
+
+ndtms_age <- c("18-29 yrs", "30-49 yrs", "50+ yrs")
+
+ndtms_append <-
+  data.frame(DemographicLabel = paste0("Persons: ", ndtms_age)
+             , Gender = "Persons"
+             , AgeGrp = ndtms_age
+             , IMD = NA
+             , Ethnicity = NA)
+
+# add into main table
+demo_table <- 
+  demo_table %>% 
+  bind_rows(ndtms_append)
+
+
+#######################################################################################
+# Manual additions for life expectancy indicators requested by RW.
+# Manually added to SQL server, but included here for rebuild.
+
+agegrp_LE <-  data.frame (
+  AgeGrp = "15-99 yrs"
+)
+
+demo_LE <- agegrp_LE %>% 
+  cross_join(gender) 
+
+demo_LEG <- 
+  demo_LE %>% 
+  mutate(Label =  paste0(Gender,': ', AgeGrp),
+         Gender = Gender,
+         AgeGrp = AgeGrp,
+         IMD = NA,
+         Ethnicity = NA) %>% 
+  select(Label, Gender, AgeGrp, IMD, Ethnicity)
+
+# Age, gender, IMD
+demo_LEi5 <- demo_LE %>% cross_join(imd5) %>%
+  mutate(Label = paste0(Gender,': ', AgeGrp,': IMD Quintile',IMD),
+         Gender = Gender,
+         AgeGrp = AgeGrp,
+         IMD = paste0('Q',IMD),
+         Ethnicity = NA 
+  ) 
+
+# Age Gender Ethnicity
+demo_LEE <- demo_LE %>% cross_join(ethnic_codes) %>%
+  mutate(Label = paste0(Gender,': ', AgeGrp,': ',ONSGroup) ,
+         Gender = Gender,
+         AgeGrp = AgeGrp,
+         IMD = NA,
+         Ethnicity = ONSGroup
+  ) %>%
+  select(Label, Gender, AgeGrp, Ethnicity, IMD)
+
+
+# Age gender, IMD, Ethnicity
+demo_LEEi5 <- demo_LEE %>% 
+  select(-IMD) %>%
+  cross_join(imd5) %>%
+  #filter(IMD < 6)  %>%
+  mutate(Label = paste0(Label,': IMD Quintile', IMD) ,
+         Gender = Gender,
+         AgeGrp = AgeGrp,
+         IMD = paste0('Q',IMD),
+         Ethnicity = Ethnicity 
+  ) 
+
+demo_LE_table <- rbind(demo_LEG, 
+                    demo_LEi5,
+                    #demoi10,
+                    demo_LEE, 
+                    #demoEgrp,
+                    demo_LEEi5
+                    #demoEi10,
+                    #demoEgrpi5
+)
+
+demo_LE_table <- rename(demo_LE_table, DemographicLabel = Label)
+#demo_table$DemographicID <- 1:nrow(demo_table)
+demo_LE_table %>%  distinct() %>%  count()
+
+# add into main table
+demo_table <- 
+  demo_table %>% 
+  bind_rows(demo_LE_table)
+################################################################################
+
+# Manual addition for additional BCC indicators.
+# Manually added to SQL server, but included here for rebuild.
+
+persons_only <- c("18-64 yrs", "14+ yrs", "<18 yrs")
+
+bcc_append <-
+  data.frame(DemographicLabel = paste0("Persons: ", persons_only)
+             , Gender = "Persons"
+             , AgeGrp = persons_only
+             , IMD = NA
+             , Ethnicity = NA)
+
+
+bcc_all_gender <- data.frame (
+  AgeGrp = c("5-9 yrs", "<18 yrs", "16-17 yrs", "10-15 yrs")
+)
+
+# Age and gender
+bcc_age_g <- bcc_all_gender %>% 
+  cross_join(gender) 
+
+bcc_append <- 
+  bcc_append %>% 
+  bind_rows(
+  bcc_age_g %>% 
+  mutate(
+         DemographicLabel =  paste0(Gender,': ', AgeGrp),
+         Gender = Gender,
+         AgeGrp = AgeGrp,
+         IMD = NA,
+         Ethnicity = NA) %>% 
+  select(DemographicLabel, Gender, AgeGrp, IMD, Ethnicity)
+  )
+
+
+bcc_append <-
+  bcc_append %>% 
+  bind_rows(
+    data.frame(DemographicLabel = "Female: 50-70 yrs"
+               , Gender = "Female"
+               , AgeGrp = "50-70 yrs"
+               , IMD = NA
+               , Ethnicity = NA)
+  )
+
+
+# add into main table
+demo_table <- 
+  demo_table %>% 
+  bind_rows(bcc_append)
+
+
+###############################################################################
+# Write output
 library(DBI)
 con <- dbConnect(odbc::odbc(), .connection_string = "Driver={SQL Server};server=MLCSU-BI-SQL;database=EAT_Reporting_BSOL", 
                  timeout = 10)
