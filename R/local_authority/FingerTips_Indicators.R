@@ -26,7 +26,10 @@ fetch_meta <- function(FingerTips_id) {
       `Source of numerator` = `Source of numerator...10`,
       `Source of denominator`  = `Source of denominator...12`,
       `External Reference` = Links,
-      `Rate Type` = `Value type`,
+      `Rate Type` = case_when(
+        `Value type` == "Proportion" ~ `Value type`,
+        grepl("rate", tolower(`Value type`)) ~ paste(`Value type`, "per", Unit)
+        ),
       `Simple Definition` = case_when(
         is.na(`Simple Definition`) ~ Definition,
         TRUE ~ `Simple Definition`
@@ -36,7 +39,7 @@ fetch_meta <- function(FingerTips_id) {
       c(Caveats, `Definition of denominator`, `Definition of numerator`,
         `External Reference`, Polarity, `Simple Definition`,
         `Source of numerator`, `Source of denominator`, Unit, Methodology,
-        `Value type`)
+        `Rate Type`)
     )
   return(meta_data)
 }
@@ -71,7 +74,7 @@ get_CI_method <- function(meta) {
   # Estimate the confidence interval method based on the methodology
   #   - Rates -> Byar's Method
   #   - Otherwise -> Wilson's
-  Value_type = meta %>% pull("Value type")
+  Value_type = meta %>% pull("Rate Type")
   if (grepl("rate", tolower(Value_type))) {
     return("Byar's Method")
   } else if (grepl("proportion", tolower(Value_type))){
@@ -434,16 +437,16 @@ for (i in 1:nrow(meta_ids)) {
 
 collected_additional_meta <- rbindlist(additional_meta_list) 
 
-meta <- readxl::read_excel(
-  "../../data/OF-Other-Tables.xlsx",
-  sheet = "Meta"
-)
-
 #################################################################
 ##                Mutate into Staging Table                    ##
 #################################################################
 print("------------- Mutate into Staging Table --------------")
 # Load ID lookup tables
+
+meta <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Meta"
+)
 
 demographics <- readxl::read_excel(
   "../../data/OF-Other-Tables.xlsx",
@@ -517,9 +520,6 @@ simple_defs <- readxl::read_excel(
 # Process meta data
 output_meta <- collected_meta %>% 
   rbind(collected_additional_meta) %>%
-  mutate(
-    `Rate Type` = NA
-  ) %>%
   left_join(
     simple_defs, 
     join_by(IndicatorID),
@@ -550,7 +550,7 @@ output_meta <- collected_meta %>%
       TRUE ~ `Rate Type`
     )
   ) %>%
-  select(-c(Unit, Methodology, `Value type`, WrittenDefinition)) %>%
+  select(-c(Unit, Methodology, WrittenDefinition)) %>%
   tidyr::pivot_longer(
     cols=-IndicatorID,
     names_to='ItemLabel',
