@@ -5,12 +5,16 @@ OUTCOMES FRAMEWORK
 
 	22401	Emergency Hospital Admissions due to a fall in adults aged over 65yrs
 	92622	Emergency Hospital Admissions for diabetes (under 19 years)
+	92623	Admissions for epilepsy (under 19 years)
 	93229	Emergency Hospital Admissions for Coronary Heart Disease (CHD)
 	93231	Emergency Hospital Admissions for Stroke
 
-w/c: 20/05/2024
 	93232	Emergency Hospital Admissions for Myocardial Infarction (Heart Attack)
 	93575	Emergency Hospital Admissions for Respiratory Disease
+	92302	Emergency Hospital Admissions for COPD (35+)
+	90810	Hospital admissions caused by asthma in children <19yrs
+    41401   Reduce hip fractures in people age 65yrs and over	
+    90808   Hospital admissions due to substance misuse (15 to 24 years).
 
 ==================================================================================================================================================================*/
 
@@ -31,13 +35,14 @@ CREATE TEMP STAGING DATA TABLES
 
 DROP TABLE IF EXISTS   	#BSOL_OF_tbIndicator_PtsCohort_IP
 DROP TABLE IF EXISTS   	#BSOL_OF_tbStaging_NumeratorData
+DROP TABLE IF EXISTS    #90808_ICD10_Codes
 
 CREATE TABLE			#BSOL_OF_tbIndicator_PtsCohort_IP (EpisodeID BIGINT NOT NULL)
 
 CREATE TABLE			#BSOL_OF_tbStaging_NumeratorData 
 
 (						[IndicatorID]			INT
-,						[ReferenceID]			INT
+,						[ReferenceID]			VARCHAR (20)
 ,						[TimePeriod]			INT
 ,						[Financial_Year]		VARCHAR (7)
 ,						[Ethnicity_Code]		VARCHAR (5)
@@ -55,7 +60,8 @@ CREATE TABLE			#BSOL_OF_tbStaging_NumeratorData
 ,						EpisodeID				BIGINT NOT NULL 
 )
 
-
+--select * from #BSOL_OF_tbStaging_NumeratorData 
+--select * from #BSOL_OF_tbIndicator_PtsCohort_IP
 /*==================================================================================================================================================================
 INSERT Inpatient Admission Episode Ids into Staging temp table for all Birmingham and Solihull Residents
 =================================================================================================================================================================*/
@@ -64,7 +70,8 @@ INSERT			INTO #BSOL_OF_tbIndicator_PtsCohort_IP   (EpisodeID)
 (
 SELECT			T1.EpisodeID
 FROM			[EAT_Reporting].[dbo].[tbInpatientEpisodes] T1
-INNER JOIN		[EAT_Reporting].[dbo].[tbPatientGeography] T2
+INNER JOIN		[EAT_Reporting].[dbo].[tbIPPatientGeography] T2		--New Patient Geography for Inpatients dataset following Unified SUS switch over
+				--[EAT_Reporting].[dbo].[tbPatientGeography] T2		--Patient Geography data table pre-Unified SUS switch over
 ON				T1.EpisodeId = T2.EpisodeId
 
 WHERE			ReconciliationPoint BETWEEN  @StartMonth AND @EndMonth
@@ -73,7 +80,8 @@ AND				T2.OSLAUA  IN ('E08000025', 'E08000029')					--Bham & Solihull LA
 
 )
 
-
+--select * from EAT_Reporting.dbo.tbPatientGeography
+--select * from #BSOL_OF_tbIndicator_PtsCohort_IP
 /*==================================================================================================================================================================
 22401 -	Emergency hospital admissions due to a fall in adults aged over 65yrs
 			
@@ -170,6 +178,45 @@ AND				T2.DiagnosisOrder = 1							--Primary Diagnosis position
 GROUP BY		T1.EpisodeId
 
 )
+
+
+/*==================================================================================================================================================================
+92623	Admissions for epilepsy (under 19 years)
+		
+Definition of Numerator: 
+Emergency hospital admissions of children and young people aged under 19 years with primary diagnosis of G40 (epilepsy) or G41 (Status epilepticus). 
+The number of finished emergency admissions (episode number equals 1, admission method starts with 2)
+=================================================================================================================================================================*/
+
+
+INSERT INTO		#BSOL_OF_tbStaging_NumeratorData
+(				ReferenceID
+,				EpisodeID
+,				Numerator
+)
+
+(
+SELECT			'92623'							AS [ReferenceID]
+,				T1.EpisodeId
+,				SUM (1)							AS [Numerator]	
+
+FROM			#BSOL_OF_tbIndicator_PtsCohort_IP T1
+
+INNER JOIN		EAT_Reporting.dbo.tbIpDiagnosisRelational T2
+ON				T1.EpisodeId = T2.EpisodeID	
+
+INNER JOIN		EAT_Reporting.dbo.tbInpatientEpisodes T3
+ON				T1.EpisodeID = T3.EpisodeId
+
+WHERE			1=1
+AND				LEFT(T3.AdmissionMethodCode,1) = 2				--Emergency Admissions
+AND				T3.AgeOnAdmission < 19							--Children and young people aged under 19 years
+AND				T3.OrderInSpell =1								--First Episode in Spell
+AND				LEFT(T2.DiagnosisCode,3) IN ('G40', 'G41')		--Epilepsy or Status epilepticus
+AND				T2.DiagnosisOrder = 1							--Primary Diagnosis position
+
+GROUP BY		T1.EpisodeId)
+
 
 
 /*==================================================================================================================================================================
@@ -455,12 +502,223 @@ GROUP BY		T1.EpisodeId
 )
 
 /*==================================================================================================================================================================
+ReferenceID  41401 - Reduce hip fractures in people age 65yrs and over		
+
+ The number of first finished emergency admission episodes in patients aged 65 and over at the time 
+ of admission (episode order number equals 1, admission method starts with 2), with a recording of 
+ fractured neck of femur classified by primary diagnosis code (ICD10 S72.0 Fracture of neck of femur;
+ S72.1 Pertrochanteric fracture and S72.2 Subtrochanteric fracture) in financial year in which episode ended.
+=================================================================================================================================================================*/
+
+
+INSERT INTO		#BSOL_OF_tbStaging_NumeratorData
+(				ReferenceID
+,				EpisodeID
+,				Numerator
+)
+
+(
+SELECT			'41401'							AS [ReferenceID]
+,				T1.EpisodeId
+,				SUM(1)							AS [Numerator]	
+
+FROM			#BSOL_OF_tbIndicator_PtsCohort_IP T1
+
+INNER JOIN		EAT_Reporting.dbo.tbIpDiagnosisRelational T2
+ON				T1.EpisodeId = T2.EpisodeID	
+
+INNER JOIN		EAT_Reporting.dbo.tbInpatientEpisodes T3
+ON				T1.EpisodeID = T3.EpisodeId
+
+WHERE			1=1
+AND 			LEFT(T3.AdmissionMethodCode,1) = 2										--Emergency Admissions
+AND				T3.OrderInSpell =1														--First Episode in Spell
+AND				LEFT(T2.DiagnosisCode,4) like ('S72[0-2]')                              --Hip Fractures
+AND				T3.AgeOnAdmission >= 65                                                 --Age 65+
+
+
+GROUP BY		T1.EpisodeId
+
+)
+
+/*==================================================================================================================================================================
+ReferenceID  90808 - Hospital admissions due to substance misuse (15 to 24 years).
+=================================================================================================================================================================*/
+
+  SELECT DISTINCT 
+         [ICD10Code]
+	INTO #90808_ICD10_Codes
+    FROM [Reference].[dbo].[DIM_tbICD10]
+   WHERE LEFT([ICD10Code],3) LIKE 'F1[1-9]'
+
+  INSERT INTO #90808_ICD10_Codes (
+         [ICD10Code]
+		 )
+		 (
+  SELECT DISTINCT 
+         [ICD10Code]
+    FROM [Reference].[dbo].[DIM_tbICD10]
+   WHERE LEFT([ICD10Code],3) = 'T40'
+         )
+
+  INSERT INTO #90808_ICD10_Codes (
+         [ICD10Code]
+		 )
+		 (
+  SELECT DISTINCT 
+         [ICD10Code]
+    FROM [Reference].[dbo].[DIM_tbICD10]
+   WHERE LEFT([ICD10Code],3) = 'T52'
+         )
+
+  INSERT INTO #90808_ICD10_Codes (
+         [ICD10Code]
+		 )
+		 (
+  SELECT DISTINCT 
+         [ICD10Code]
+    FROM [Reference].[dbo].[DIM_tbICD10]
+   WHERE LEFT([ICD10Code],3) = 'T59'
+         )  
+
+  INSERT INTO #90808_ICD10_Codes (
+         [ICD10Code]
+		 )
+		 (
+  SELECT DISTINCT 
+         [ICD10Code]
+    FROM [Reference].[dbo].[DIM_tbICD10]
+   WHERE LEFT([ICD10Code],4) = 'T436'
+         )  
+
+  INSERT INTO #90808_ICD10_Codes (
+         [ICD10Code]
+		 )
+		 (
+  SELECT DISTINCT 
+         [ICD10Code]
+    FROM [Reference].[dbo].[DIM_tbICD10]
+   WHERE LEFT([ICD10Code],3) = 'Y12'
+         )  
+
+  INSERT INTO #90808_ICD10_Codes (
+         [ICD10Code]
+		 )
+		 (
+  SELECT DISTINCT 
+         [ICD10Code]
+    FROM [Reference].[dbo].[DIM_tbICD10]
+   WHERE LEFT([ICD10Code],3) = 'Y16'
+         )  
+  
+  INSERT INTO #90808_ICD10_Codes (
+         [ICD10Code]
+		 )
+		 (
+  SELECT DISTINCT 
+         [ICD10Code]
+    FROM [Reference].[dbo].[DIM_tbICD10]
+   WHERE LEFT([ICD10Code],3) = 'Y19'
+         )
+
+
+INSERT INTO		#BSOL_OF_tbStaging_NumeratorData
+(				ReferenceID
+,				EpisodeID
+,				Numerator
+)
+
+(
+SELECT			'90808'							AS [ReferenceID]
+,				T1.EpisodeId
+,				SUM(1)							AS [Numerator]	
+
+FROM			#BSOL_OF_tbIndicator_PtsCohort_IP T1
+
+INNER JOIN		EAT_Reporting.dbo.tbIpDiagnosisRelational T2
+ON				T1.EpisodeId = T2.EpisodeID	
+
+INNER JOIN		EAT_Reporting.dbo.tbInpatientEpisodes T3
+ON				T1.EpisodeID = T3.EpisodeId
+
+INNER JOIN      #90808_ICD10_Codes T4
+ON			    T2.DiagnosisCode = T4.ICD10Code
+
+WHERE			1=1
+AND 			T2.DiagnosisOrder = 1											        -- Primary Diagnosis
+AND				T3.OrderInSpell = 1														--First Episode in Spell
+AND				T3.AgeOnAdmission BETWEEN 15 AND 24                                     -- Age between 15 and 24
+
+
+GROUP BY		T1.EpisodeId
+
+)
+
+
+/*==================================================================================================================================================================
+ReferenceID  21001 - Emergency Hospital Admissions for Intentional Self-Harm
+
+The number of first finished emergency admission episodes in patients (episode number equals 1, admission method starts with 2), 
+with a recording of self harm by cause code (ICD10 X60 to X84) in financial year in which episode ended. 
+Regular and day attenders have been excluded. Regions are the sum of the Local Authorities. England is the sum of all Local Authorities 
+and admissions coded as U (England NOS).
+
+Numerator Extraction: Emergency Hospital Admissions for Intentional Self Harm. Counts of first finished consultant episodes with an external cause of intentional self harm 
+and an emergency admission method were extracted from HES. First finished consultant episode counts (excluding regular attenders) were summed in an excel pivot table filtered for emergency admission method 
+and separated by quinary age for all ages, sex and local authority in the respective financial year. 
+Self harm is defined by external cause codes (ICD10 X60 to X84) which include: 
+• Intentional self poisoning (X60 to X69 inclusive), 
+• Intentional self harm by hanging, drowning or jumping (X70, X71 and X80), 
+• Intentional self harm by firearm or explosive (X72 to X75 inclusive), 
+• Intentional self harm using other implement (X78 and X79) 
+• Intentional self harm other (X76, X77 and X81 to X84) 
+Please note this definition does not include events of undetermined intent.
+
+Numerator Aggregation or allocation: Local Authority of residence of each Finished Admission Episode is allocated by HES. 
+Values for England, Regions, Counties, Centres, Deprivation deciles and ONS cluster groups are aggregates of these. 
+Data for Isles of Scilly and City of London have been aggregated with Cornwall and Hackney respectively in order to prevent possible disclosure and disclosure by differencing.
+=================================================================================================================================================================*/
+
+INSERT INTO		#BSOL_OF_tbStaging_NumeratorData
+(				ReferenceID
+,				EpisodeID
+,				Numerator
+)
+
+(
+SELECT			'21001'							AS [ReferenceID]
+,				T1.EpisodeId
+,				SUM(1)							AS [Numerator]	
+
+FROM			#BSOL_OF_tbIndicator_PtsCohort_IP T1
+
+INNER JOIN		EAT_Reporting.dbo.tbIpDiagnosisRelational T2
+ON				T1.EpisodeId = T2.EpisodeID	
+
+INNER JOIN		EAT_Reporting.dbo.tbInpatientEpisodes T3
+ON				T1.EpisodeID = T3.EpisodeId
+
+WHERE			1=1
+AND 			LEFT(T3.AdmissionMethodCode,1) = 2										--Emergency Admissions
+AND				T3.OrderInSpell =1														--First Episode in Spell
+AND				LEFT(T2.DiagnosisCode,3) IN ('X60','X61','X62','X63','X64','X66','X67','X68','X69'
+						,'X70','X71','X72','X73','X74','X75','X76','X77','X78','X79'
+						,'X80','X81','X82','X83','X84')                              --Self Harm
+
+GROUP BY		T1.EpisodeId
+
+)
+
+
+
+--select * from #BSOL_OF_tbStaging_NumeratorData
+
+/*==================================================================================================================================================================
 UPDATE TimePeriod, Gender, Age and GP Practice from Source data at time of admission
 =================================================================================================================================================================*/
 
 UPDATE		T1
 SET			T1.[TimePeriod]		= T2.[ReconciliationPoint]
-,			T1.[Gender]			= T2.[GenderDescription]
 ,			T1.[Age]			= T2.[AgeonAdmission]
 ,			T1.[GP_Practice]	=  T2.[GMPOrganisationCode]
 
@@ -468,6 +726,24 @@ FROM		#BSOL_OF_tbStaging_NumeratorData T1
 
 INNER JOIN	[EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
 ON			T1.[EpisodeID] = T2.[EpisodeId]
+
+
+/*==================================================================================================================================================================
+UPDATE Gender from Source data at time of admission
+=================================================================================================================================================================*/
+
+--SELECT * FROM #BSOL_OF_tbStaging_NumeratorData T1
+
+UPDATE		T1
+SET			T1.[Gender]			= T3.[GenderDescription]
+
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN	[EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
+ON			T1.[EpisodeID] = T2.[EpisodeId]
+
+LEFT JOIN	[Reference].[dbo].[DIM_tbGender] T3
+ON			T2.GenderCode = T3.GenderCode
 
 
 /*==================================================================================================================================================================
@@ -480,7 +756,8 @@ SET			T1.[LSOA_2011]	= T2.[LowerlayerSuperOutputArea2011]
 
 FROM		#BSOL_OF_tbStaging_NumeratorData T1
 
-INNER JOIN	[EAT_Reporting].[dbo].[tbPatientGeography] T2
+INNER JOIN	[EAT_Reporting].[dbo].[tbIPPatientGeography] T2		--New Patient Geography for Inpatients dataset following Unified SUS switch over
+			--[EAT_Reporting].[dbo].[tbPatientGeography] T2		--Patient Geography data table pre-Unified SUS switch over
 ON			T1.[EpisodeID] = T2.[EpisodeId]
 
 
@@ -631,7 +908,7 @@ INSERT FINAL Numerator Date into [EAT_Reporting_BSOL].[OF].[IndicatorData]
 
 --FROM			#BSOL_OF_tbStaging_NumeratorData
 
-
+--WHERE			ReferenceID ='21001'
 
 --GROUP BY		[IndicatorID]
 --,				[ReferenceID]
