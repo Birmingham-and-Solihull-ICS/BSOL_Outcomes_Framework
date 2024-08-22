@@ -388,7 +388,7 @@ end_date <- function(date) {
 ##                Collect Data from FingerTips                 ##
 #################################################################
 
-
+print("------------- Collecting FingerTips data --------------")
 all_data <- list()
 all_meta <- list()
 
@@ -419,7 +419,7 @@ collected_meta <- rbindlist(all_meta)
 #################################################################
 ##               Collect Additional Meta Data                  ##
 #################################################################
-
+print("------------- Collecting additional meta data --------------")
 meta_ids <- ids <- read_excel(
   "../../data/LA_FingerTips_Indicators.xlsx",
   sheet = "meta_only")
@@ -432,69 +432,25 @@ for (i in 1:nrow(meta_ids)) {
   additional_meta_list[[i]] <- meta_data_i
 }
 
-collected_additional_meta <- rbindlist(additional_meta_list) %>%
-  mutate(
-    `Rate Type` = NA
-  ) %>%
-  select(-c(Unit, Methodology, `Value type`))
+collected_additional_meta <- rbindlist(additional_meta_list) 
 
 meta <- readxl::read_excel(
   "../../data/OF-Other-Tables.xlsx",
   sheet = "Meta"
 )
 
-additional_meta <- collected_additional_meta %>%
-  tidyr::pivot_longer(
-    cols=-IndicatorID,
-    names_to='ItemLabel',
-    values_to='MetaValue') %>%
-  left_join(
-    meta,
-    join_by(ItemLabel)) %>%
-  select(c(IndicatorID,ItemID,MetaValue)) %>%
-  arrange(IndicatorID, ItemID)
-
-##  Amend meta data
-
-mask = (additional_meta$ItemID == 1 & additional_meta$IndicatorID == 130)
-additional_meta$MetaValue[mask] = paste("Solihull data currently unavailable.", additional_meta$MetaValue[mask])
-
-# ID 118 numerator definition
-mask = (additional_meta$ItemID == 2 & additional_meta$IndicatorID == 118) 
-additional_meta$MetaValue[mask] = "The number of deaths among adults in drug treatment in the local authority."
-# ID 118 denominator definition
-mask = (additional_meta$ItemID == 3 & additional_meta$IndicatorID == 118) 
-additional_meta$MetaValue[mask] = "The number of adults in drug treatment in the local authority."
-# ID 118 polarity
-mask = (additional_meta$ItemID == 5 & additional_meta$IndicatorID == 118) 
-additional_meta$MetaValue[mask] = "Low is good."
-# ID 118 rate type
-mask = (additional_meta$ItemID == 6 & additional_meta$IndicatorID == 118) 
-additional_meta$MetaValue[mask] = "Rate per 1,000"
-
-# ID 119 numerator definition
-mask = (additional_meta$ItemID == 2 & additional_meta$IndicatorID == 119) 
-additional_meta$MetaValue[mask] = "The number of deaths among adults in alcohol treatment in the local authority."
-# ID 119 denominator definition
-mask = (additional_meta$ItemID == 3 & additional_meta$IndicatorID == 119) 
-additional_meta$MetaValue[mask] = "The number of adults in alcohol treatment in the local authority."
-# ID 119 polarity
-mask = (additional_meta$ItemID == 5 & additional_meta$IndicatorID == 119) 
-additional_meta$MetaValue[mask] = "Low is good."
-# ID 119 rate type
-mask = (additional_meta$ItemID == 6 & additional_meta$IndicatorID == 119) 
-additional_meta$MetaValue[mask] = "Rate per 1,000"
-
 #################################################################
 ##                Mutate into Staging Table                    ##
 #################################################################
-
+print("------------- Mutate into Staging Table --------------")
 # Load ID lookup tables
 
 demographics <- readxl::read_excel(
   "../../data/OF-Other-Tables.xlsx",
   sheet = "Demographic"
 ) %>% 
+  # Remove repeated entry for "Persons: <18 yrs"
+  filter(DemographicID != 7623) %>%
   select(c(DemographicID, DemographicLabel))
 
 aggregations <- readxl::read_excel(
@@ -548,12 +504,53 @@ output_data <- collected_data %>%
     )
   )
 
+
+# Load simple definition write-ups
+simple_defs <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Definitions"
+) %>%
+  filter(Definition != "Duplicate") %>%
+  mutate(WrittenDefinition = SimpleDefinition) %>%
+  select(c(IndicatorID, WrittenDefinition))
+
 # Process meta data
-output_meta <- collected_meta %>%
+output_meta <- collected_meta %>% 
+  rbind(collected_additional_meta) %>%
   mutate(
     `Rate Type` = NA
   ) %>%
-  select(-c(Unit, Methodology, `Value type`)) %>%
+  left_join(
+    simple_defs, 
+    join_by(IndicatorID),
+    relationship = "one-to-one"
+    ) %>%
+  mutate(
+    `Simple Definition` = case_when(
+      is.na(WrittenDefinition) ~ `Simple Definition`,
+      TRUE ~ `Simple Definition`,
+    ),
+    # Update LARC caveats text
+    Caveats = case_when(
+      IndicatorID == 130 ~ paste(
+        "Solihull data currently unavailable.", 
+        Caveats
+      ),
+      IndicatorID %in% c(118,119) ~ "Indicator presented as the mortality rate per 1,000. This is different to FingerTips which gives the equivalenct indicator as a mortality ratio.",
+      TRUE ~ Caveats
+    ),
+    # Update NDTMS denominator Definition
+    `Definition of denominator` = case_when(
+      IndicatorID == 118 ~ "The number of adults in drug treatment in the local authority.",
+      IndicatorID == 119 ~ "The number of adults in alcohol treatment in the local authority.",
+      TRUE ~ `Definition of numerator`
+    ),
+    `Rate Type` = case_when(
+      IndicatorID %in% c(118,119) ~ "Rate per 1,000",
+      TRUE ~ `Rate Type`
+    )
+  ) %>%
+  select(-c(Unit, Methodology, `Value type`, WrittenDefinition)) %>%
   tidyr::pivot_longer(
     cols=-IndicatorID,
     names_to='ItemLabel',
@@ -568,12 +565,7 @@ output_meta <- collected_meta %>%
 #################################################################
 ##                     Save final output                       ##
 #################################################################
-
-# Filter out irregular indicator demographic
-output_data <- output_data %>%
-  filter(
-    !(is.na(DemographicID) & IndicatorID == 47)
-  )
+print("------------- Save final output  --------------")
 
 # Save data
 write.csv(

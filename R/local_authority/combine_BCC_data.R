@@ -81,8 +81,6 @@ OF_meta <- bind_rows(meta_dfs) %>%
 # Remove all HTML tags
 OF_meta$MetaValue <- gsub("<.*?>", "", OF_meta$MetaValue)
 
-
-
 #################################################################
 ###                      Data Checks                          ###
 #################################################################
