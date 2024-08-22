@@ -270,7 +270,7 @@ demo_table <-
 # Manual addition for additional BCC indicators.
 # Manually added to SQL server, but included here for rebuild.
 
-persons_only <- c("18-64 yrs", "14+ yrs", "<18 yrs")
+persons_only <- c("18-64 yrs", "14+ yrs")
 
 bcc_append <-
   data.frame(DemographicLabel = paste0("Persons: ", persons_only)
