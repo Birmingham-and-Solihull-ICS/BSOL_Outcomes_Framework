@@ -559,7 +559,6 @@ output_meta <- collected_meta %>%
     meta,
     join_by(ItemLabel)) %>%
   select(c(IndicatorID,ItemID,MetaValue)) %>%
-  rbind(additional_meta) %>%
   arrange(IndicatorID, ItemID)
 
 #################################################################
