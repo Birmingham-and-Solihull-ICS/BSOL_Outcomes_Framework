@@ -20,12 +20,13 @@ con <- dbConnect(odbc::odbc()
 
 sql1 <- "Select ReferenceID from [OF].[IndicatorList]"
 
-inds <- dbGetQuery(con, sql1) %>%  pull()
+inds <- dbGetQuery(con, sql1) %>% pull()
+
+# Fingertips IDs are all numeric, others are not.  Filter for starting numeric
+inds2 <- inds[grepl("^[[:digit:]]+",inds)]
 
 
-md <- indicator_metadata(
-  IndicatorID = inds
-)
+md <- indicator_metadata(IndicatorID = inds2)
 
 
 # Pivot

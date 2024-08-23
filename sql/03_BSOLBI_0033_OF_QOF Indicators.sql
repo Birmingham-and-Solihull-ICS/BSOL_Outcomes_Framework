@@ -738,6 +738,45 @@
 
 
 
+/*=================================================================================================
+ 91215 - Percentage of dementia care plans reviewed in the last 12 months 		
+=================================================================================================*/
+
+  INSERT INTO [EAT_Reporting_BSOL].[OF].[IndicatorDataPredefinedDenominator] (
+        [IndicatorID]
+       ,[ReferenceID]
+       ,[TimePeriod]
+       ,[TimePeriodDesc]
+       ,[GP_Practice]
+       ,[PCN]
+       ,[Locality_Reg]
+       ,[Numerator]
+       ,[Denominator]
+       ,[Indicator_Level]
+       ,[LSOA_2011]
+       ,[LSOA_2021]
+       ,[Ethnicity_Code]
+	   )
+	   (
+  SELECT '107'
+        ,'91215'
+        ,T1.FinancialYear
+        ,'Financial Year'
+        ,T2.GPPracticeCode_Original
+        ,T2.PCN
+		,T2.Locality as Locality_Reg
+		,T1.Numerator
+		,T1.Denominator
+		,'Practice Level'
+		,NULL
+		,NULL
+		,NULL
+    FROM [AnalystGlobal].[Performance].[QOFIndicatorsByPractice] T1
+   INNER JOIN EAT_Reporting_BSOL.Reference.BSOL_ICS_PracticeMapped T2
+      ON T1.PracticeCode = T2.GPPracticeCode_Original
+   WHERE IndicatorCode = 'DEM004'
+     AND T2.ICS_2223 = 'BSOL'
+	    )
 
 
 
