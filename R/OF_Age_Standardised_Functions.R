@@ -4,6 +4,7 @@ library(DBI)
 library(odbc)
 library(IMD)
 library(PHEindicatormethods)
+library(readxl)
 
 rm(list = ls())
 
@@ -65,23 +66,26 @@ popfile_ward <- read.csv("data/c21_a18_e20_s2_ward.csv", header = TRUE, check.na
 #3. Get numerator data ---------------------------------------------------------
 #3.1 Load the indicator data from the warehouse --------------------------------
 
-# Read the CSV file to get the available indicators
-parameter_combinations <- read_csv("data/parameter_combinations.csv", show_col_types = FALSE)
+# Read the Excel file to get the available indicators
+parameter_combinations <- read_excel("data/parameter_combinations.xlsx", 
+                                     sheet = "standardised_indicators")
 
 # Filter based on indicators requiring age-standardization
 indicators_params <- parameter_combinations %>% 
-  filter(StandardizedIndicator == 'Y')  # The flag used to choose which indicators 
+  filter(StandardizedIndicator == 'Y' & PredeterminedDenominator == "N") %>%   # The flag used to choose which indicators 
+  filter(IndicatorID %in% c(114))
 
 # Get the unique indicator IDs to be used for importing data from database
 indicator_ids <- unique(indicators_params$IndicatorID)
 
 # Convert the indicator IDs to a comma-separated values
-indicator_ids <- paste(indicator_ids, collapse = ", ")
+indicator_ids <- paste(indicator_ids, collapse = ", ") 
 
 # Construct the SQL query with the indicator IDs
 query <- paste0("SELECT *
                 FROM [EAT_Reporting_BSOL].[OF].[IndicatorData]
                 WHERE IndicatorID IN (", indicator_ids, ")")
+
 
 # Execute the SQL query
 indicator_data <- dbGetQuery(con, query) %>% 
@@ -240,11 +244,11 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
   }
  
 # Example
-my_numerator <- get_numerator(indicator_data = indicator_data,
-                              indicator_id = 24,
-                              reference_id = 92302,
-                              min_age = 35,
-                              max_age = NA)
+# my_numerator <- get_numerator(indicator_data = indicator_data,
+#                               indicator_id = 114,
+#                               reference_id = 41401,
+#                               min_age = 65,
+#                               max_age = NA)
 
 
 ##4.3 Function 3: Create denominator dataset  ----------------------------------
@@ -304,8 +308,8 @@ get_denominator <- function(pop_estimates, numerator_data){
 } 
 
 # Example
-my_denominator <- get_denominator(pop_estimates = popfile_ward, 
-                                  numerator_data = my_numerator)
+# my_denominator <- get_denominator(pop_estimates = popfile_ward,
+#                                   numerator_data = my_numerator)
 
 #5. Age-standardised rates calculation -----------------------------------------
 
@@ -585,15 +589,15 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
 }
 
 # Example
-result <- calculate_age_std_rate(
-  indicator_id = 24,
-  denominator_data = my_denominator,
-  numerator_data = my_numerator,
-  aggID = c( "LAD22CD"),
-  genderGrp = "Persons",
-  ageGrp = "35+ yrs",
-  multiplier = 100000
-)
+# result <- calculate_age_std_rate(
+#   indicator_id = 114,
+#   denominator_data = my_denominator,
+#   numerator_data = my_numerator,
+#   aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
+#   genderGrp = "Persons",
+#   ageGrp = "65+ yrs",
+#   multiplier = 100000
+# )
 
 
 #6. Process all parameters -----------------------------------------------------
@@ -681,6 +685,29 @@ results <- indicators_params %>% # Filtered to indicators requiring age-standard
   do(process_parameters(.)) %>%  # Apply the function to each row
   ungroup() #Remove the rowwise grouping, so the output is a simple tibble
 
+## Optional: Only use it to run a small number of indicators and don't want to
+## use Excel file as you already know the indicator parameters
+
+my_numerator <- get_numerator(indicator_data = indicator_data,
+                              indicator_id = 114,
+                              reference_id = 41401,
+                              min_age = 65,
+                              max_age = NA)
+
+my_denominator <- get_denominator(pop_estimates = popfile_ward,
+                                  numerator_data = my_numerator)
+
+result <- calculate_age_std_rate(
+  indicator_id = 114,
+  denominator_data = my_denominator,
+  numerator_data = my_numerator,
+  aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
+  genderGrp = "Persons",
+  ageGrp = "65+ yrs",
+  multiplier = 100000
+)
+
+# Use 'result' variable to write the data into the database
 
 # Write into database ----------------------------------------------------------
 
@@ -697,7 +724,8 @@ dbWriteTable(
   sql_connection,
   Id(schema = "dbo", table = "BSOL_0033_OF_Age_Standardised_Rates"),
   results,
-  overwrite = TRUE
+  append = TRUE
+  # overwrite = TRUE
   )
 
 # End the timer

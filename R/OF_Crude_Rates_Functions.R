@@ -4,6 +4,7 @@ library(DBI)
 library(odbc)
 library(IMD)
 library(PHEindicatormethods)
+library(readxl)
 
 rm(list = ls())
 
@@ -35,11 +36,18 @@ Ward_LAD_unique <- lsoa_ward_lad_map %>%
 
 ##2.2 Ward to Locality lookup --------------------------------------------------
 ward_locality_map <- read.csv("data/ward_to_locality.csv", header = TRUE, check.names = FALSE)
+
 ward_locality_map <- ward_locality_map %>% 
   rename(LA = ParentCode,
          WardCode = AreaCode,
          WardName = AreaName)
 
+# Get unique pairs of Ward and Locality
+ward_locality_unique <- ward_locality_map %>% 
+  rename(WD22CD = WardCode,
+         WD22NM = WardName) %>% 
+  select(WD22CD, WD22NM, Locality) %>% 
+  distinct()
 
 ##2.3 Ethnicity code mapping ---------------------------------------------------
 ethnicity_map <- dbGetQuery(
@@ -60,13 +68,14 @@ popfile_ward <- read.csv("data/C21_a86_e20_ward.csv", header = TRUE, check.names
 #3. Get numerator data ---------------------------------------------------------
 #3.1 Load the indicator data from the warehouse --------------------------------
 
-# Read the CSV file to get the available indicators
-parameter_combinations <- read_csv("data/parameter_combinations.csv", show_col_types = FALSE)
+# Read the Excel file to get the available indicators
+parameter_combinations <- read_excel("data/parameter_combinations.xlsx", 
+                                     sheet = "crude_indicators")
 
 # Filter based on indicators requiring age-standardization
 indicators_params <- parameter_combinations %>% 
-  filter(StandardizedIndicator == 'N') # The flag used to choose which indicators 
-
+  filter(StandardizedIndicator == 'N' & PredeterminedDenominator == "N") %>%  # The flag used to choose which indicators 
+  filter(IndicatorID %in% c(32))
 # Get the unique indicator IDs to be used for importing data from database
 indicator_ids <- unique(indicators_params$IndicatorID)
 
@@ -143,7 +152,8 @@ create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator"
   
   return(output)
 }
-  
+
+
 ##4.2 Function 2: Create numerator dataset -------------------------------------
 
 # Parameters:
@@ -204,10 +214,10 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
 }
 
 # Example
-my_numerator <- get_numerator(indicator_data = indicator_data,
-                                   indicator_id = 117,
-                                   min_age = NA,
-                                   max_age = 74)
+# my_numerator <- get_numerator(indicator_data = indicator_data,
+#                                    indicator_id = 87,
+#                                    min_age = NA,
+#                                    max_age = 74)
 
 ##4.3 Function 3: Create denominator dataset  ----------------------------------
 
@@ -279,10 +289,10 @@ get_denominator <- function(min_age = NA, max_age = NA, pop_estimates, numerator
 }
 
 # Example
-my_denominator <- get_denominator(min_age = NA,
-                                    max_age = 74,
-                                    pop_estimates = popfile_ward, 
-                                    numerator_data = my_numerator)
+# my_denominator <- get_denominator(min_age = NA,
+#                                     max_age = 74,
+#                                     pop_estimates = popfile_ward, 
+#                                     numerator_data = my_numerator)
 
 #5. Crude Rates Calculation ----------------------------------------------------
 #5.1 Function 4: Calculate crude rates -----------------------------------------
@@ -313,11 +323,6 @@ get_grouping_columns <- function(rate_type) {
 # Helper function to summarize numerator and denominator data with the correct 'DataQualityID'
 get_summarized_data <- function(id, group_vars, year, denominator_data, numerator_data) {
   
-  # Get unique pairs of Wards and Localities
-  Localities_Ward_unique <- numerator_data %>% 
-    select(Locality, WD22CD, WD22NM) %>% 
-    distinct()
-  
   summarized_data <- denominator_data %>%
     filter(AggYear == year) %>%
     left_join(numerator_data %>% filter(AggYear == year),
@@ -327,7 +332,7 @@ get_summarized_data <- function(id, group_vars, year, denominator_data, numerato
   
   if (id == "WD22NM") {
     summarized_data <- summarized_data %>%
-      left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+      left_join(ward_locality_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
       group_by(across(all_of(c(group_vars, "WD22NM.y"))))
   } else if (id == "LAD22CD") {
     summarized_data <- summarized_data %>%
@@ -335,7 +340,7 @@ get_summarized_data <- function(id, group_vars, year, denominator_data, numerato
       group_by(across(all_of(c(group_vars, "LAD22CD.y"))))
   } else if (id == "Locality") {
     summarized_data <- summarized_data %>%
-      left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+      left_join(ward_locality_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
       group_by(across(all_of(c(group_vars, "Locality.y"))))
   } else if (id == "BSOL ICB") {
     summarized_data <- summarized_data %>%
@@ -355,10 +360,6 @@ get_summarized_data <- function(id, group_vars, year, denominator_data, numerato
 # Main function to calculate crude rate
 calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data, aggID, genderGrp, ageGrp, multiplier = 100000) {
   
-  # Get unique pairs of Wards and Localities
-  Localities_Ward_unique <- numerator_data %>% 
-    select(Locality, WD22CD, WD22NM) %>% 
-    distinct()
   
   # Aggregation years to calculate crude rates for 1, 3 and 5 rolling periods
   AggYears <- c(1, 3, 5)
@@ -382,18 +383,18 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
       # Conditional operations for different levels of aggregations
       if (id == "WD22NM") {
         joined_data <- joined_data %>%
-          left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
-          group_by(across(all_of(c(group_vars, "WD22NM.y")))) # Grouping by WD22NM.y
+          left_join(ward_locality_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+          group_by(across(all_of(c(group_vars, "WD22NM.y")))) # Grouping by WD22NM.u (complete wards)
         
       } else if (id == "LAD22CD") {
         joined_data <- joined_data %>%
           left_join(Ward_LAD_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
-          group_by(across(all_of(c(group_vars, "LAD22CD.y")))) # Grouping by LAD22CD.y
+          group_by(across(all_of(c(group_vars, "LAD22CD.y")))) # Grouping by LAD22CD.y (complete LADs)
         
       } else if (id == "Locality") {
         joined_data <- joined_data %>%
-          left_join(Localities_Ward_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
-          group_by(across(all_of(c(group_vars, "Locality.y")))) # Grouping by Locality.y
+          left_join(ward_locality_unique, by = c("ElectoralWardsAndDivisionsCode" = "WD22CD")) %>%
+          group_by(across(all_of(c(group_vars, "Locality.y")))) # Grouping by Locality.y (complete localities)
         
       } else if (id == "BSOL ICB") {
         joined_data <- joined_data %>%
@@ -546,15 +547,15 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
 }
 
 # Example 
-result <- calculate_crude_rate(
-  indicator_id = 11,
-  denominator_data = my_denominator,
-  numerator_data = my_numerator,
-  aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
-  genderGrp = "Persons",
-  ageGrp = "65+ yrs",
-  multiplier = 100000
-)
+# result <- calculate_crude_rate(
+#   indicator_id = 87,
+#   denominator_data = my_denominator,
+#   numerator_data = my_numerator,
+#   aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
+#   genderGrp = "Persons",
+#   ageGrp = "<75 yrs",
+#   multiplier = 100000
+# )
 
 
 #6. Process all parameters -------------------------------------------------------
@@ -664,7 +665,8 @@ dbWriteTable(
   sql_connection,
   Id(schema = "dbo", table = "BSOL_0033_OF_Crude_Rates"),
   results,
-  overwrite = TRUE
+  append = TRUE
+  # overwrite = TRUE
 )
 
 # End the timer
@@ -674,4 +676,4 @@ end_time <- Sys.time()
 time_taken <- end_time - start_time
 
 # Print the time taken
-print(paste("Time taken to run the script", time_taken))  # 6.20319673220317
+print(paste("Time taken to run the script", time_taken))  
