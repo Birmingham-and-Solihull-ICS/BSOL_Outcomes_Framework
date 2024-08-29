@@ -60,10 +60,12 @@ data <- data %>%
 # Create a copy of data to work with
 dt <- data
 
-#4. Functions to transform  time periods -----------------------------------------
-##4.1 Function to convert time period in YYYYMM format to its Fiscal Year -----------
+#4. Functions to transform  time periods ---------------------------------------
+##4.1 Function to convert time period in YYYYMM format to its Fiscal Year ------
+## E.g., 202204 to 2022/2023
+## old function name: convert_yyyymm_to_fiscal_yr
 
-convert_yyyymm_to_fiscal_yr <- function(yyyymm) {
+convert_yearmonth_period<- function(yyyymm) {
   # Extract the year and month from the input
   year <- as.integer(substr(yyyymm, 1, 4))
   month <- as.integer(substr(yyyymm, 5, 6))
@@ -73,19 +75,21 @@ convert_yyyymm_to_fiscal_yr <- function(yyyymm) {
   end_year <- start_year + 1
   
   # Format the fiscal year as YYYY/YYYY
-  fiscal_year <- paste0(start_year, "/", "20", substr(end_year, 3, 4))
+  fiscal_year <- paste0(start_year, "/", end_year)
   return(fiscal_year)
 }
 
 # Example usage
-months <- c(202204, 202205, 202206, 202208, 202301, 202303, 202304, 202407)
-fiscal_years <- sapply(months, convert_yyyymm_to_fiscal_yr)
-print(fiscal_years)
+months <- c(202203, 202204, 202205, 202206, 202301, 202303, 202304, 202407)
+fiscal_years <- sapply(months, convert_yearmonth_period)
+print(fiscal_years) # Output: "2021/2022" "2022/2023" "2022/2023" 
+                    #         "2022/2023" "2022/2023" "2022/2023" "2023/2024" "2024/2025"
 
 ##4.2 Function to convert time period in MM YYYY - MM YYYY format --------------
+##e.g., August 2014-July 2015 to 08/2014-07/2015
+## old function name: convert_to_mm_yyyy
 
-
-convert_to_mm_yyyy <- function(date_range) {
+convert_fixed_period <- function(date_range) {
   # Create a named vector for month conversion
   month_conversion <- c(
     "January" = "01", "February" = "02", "March" = "03", 
@@ -116,16 +120,18 @@ convert_to_mm_yyyy <- function(date_range) {
 }
 
 # Vectorize the function for use with dplyr
-convert_to_mm_yyyy <- Vectorize(convert_to_mm_yyyy)
+convert_fixed_period <- Vectorize(convert_fixed_period)
 
 # Example usage
 dates <- c("August 2014-July 2015", "August 2015-July 2016", "August 2016-July 2017")
-formatted_dates <- sapply(dates, convert_to_mm_yyyy)
-print(formatted_dates)
+formatted_dates <- sapply(dates, convert_fixed_period)
+print(formatted_dates) # Output: "08/2014-07/2015", "08/2015-07/2016", "08/2016-07/2017"
 
 ##4.3 Function to convert time period in 'To MM YYYY' format to its Fiscal Year -------
+##E.g., To December 2022 to 2022/2023
+## old function name: convert_to_fiscal_year
 
-convert_to_fiscal_year <- function(time_period) {
+convert_quarterly_period <- function(time_period) {
     # Extract the month and year from the input
     parts <- strsplit(time_period, " ")[[1]]
     month <- parts[2]
@@ -142,18 +148,20 @@ convert_to_fiscal_year <- function(time_period) {
   }
   
 # Vectorize the function for use with dplyr
-convert_to_fiscal_year <- Vectorize(convert_to_fiscal_year)
+convert_quarterly_period <- Vectorize(convert_quarterly_period)
   
 # Example usage
 time_periods <- c("To December 2022", "To December 2023", "To June 2022",
                     "To June 2023", "To March 2022", "To March 2023", "To March 2024",
                     "To September 2022", "To September 2023")
 
-fiscal_years <- sapply(time_periods, convert_to_fiscal_year)
-print(fiscal_years)
+fiscal_years <- sapply(time_periods, convert_quarterly_period)
+print(fiscal_years) # Output: "2022/2023", "2023/2024", "2022/2023", "2023/2024",
+                    #         "2021/2022", "2022/2023", "2023/2024", "2022/2023", "2023/2024"
   
 ##4.4 Function to convert time period in "YYYY-MM" or "YYYY/MM" to its Fiscal Year --------------
-  
+## E.g., 2022-23 to 2022/2023 or 2022/23 to 2022/2023
+
 parse_fiscal_year <- function(time_period) {
   # Split the string on either "-" or "/"
   years <- unlist(strsplit(time_period, "[-/]"))
@@ -184,14 +192,14 @@ process_time_periods <- function(data) {
     # Process the 'Month' data
     month_data <- data %>%
       filter(TimePeriodDesc == "Month") %>%
-      mutate(FiscalYear = convert_yyyymm_to_fiscal_yr(TimePeriod))
+      mutate(FiscalYear = convert_yearmonth_period(TimePeriod))
     
     # Process the 'Other' data
     other_data <- data %>%
       filter(TimePeriodDesc == "Other") %>%
       mutate(FiscalYear = case_when(
-        grepl("-", TimePeriod) ~ convert_to_mm_yyyy(TimePeriod),
-        grepl("To", TimePeriod) ~ convert_to_fiscal_year(TimePeriod),
+        grepl("-", TimePeriod) ~ convert_fixed_period(TimePeriod),
+        grepl("To", TimePeriod) ~ convert_quarterly_period(TimePeriod),
         TRUE ~ TimePeriod
       ))
     
@@ -229,8 +237,9 @@ updated_dt %>%
 ##4.6 Function to extract start and end dates separated by "/" -----------------
 # This is used to get the start date and end date from the Fiscal Year in this format:
 # 01-2021/12-2022 or 08-2022/07-2023
+# Old function: extract_and_format_dates
 
-extract_and_format_dates <- function(date_string) {
+extract_start_and_end_date_from_fixed_period <- function(date_string) {
   # Split the string by "/" to get start and end parts
   date_parts <- strsplit(date_string, "/")[[1]]
   
@@ -253,8 +262,8 @@ extract_and_format_dates <- function(date_string) {
 # Example usage
 date_string <- "08-2012/07-2013"
 
-extract_and_format_dates(date_string)$start_date # start_date
-extract_and_format_dates(date_string)$end_date # end_date
+extract_start_and_end_date_from_fixed_period(date_string)$start_date # start_date // Output: "01-08-2012"
+extract_start_and_end_date_from_fixed_period(date_string)$end_date # end_date // Output: "31-07-2013"
 
 # This is used to extract start date and end date from Fiscal Year in this format
 # 2023/2024 where the start is 1st April and end is 31st March
@@ -284,8 +293,8 @@ extract_start_and_end_date_from_fiscal_year <- function(fiscal_year) {
 }
 
 # Example usage
-extract_start_and_end_date_from_fiscal_year("2023/2024")$start_date
-extract_start_and_end_date_from_fiscal_year("2023/2024")$end_date
+extract_start_and_end_date_from_fiscal_year("2023/2024")$start_date # Start date // Output: "01-04-2023"
+extract_start_and_end_date_from_fiscal_year("2023/2024")$end_date # End date // Output: "31-03-2024"
 
 
 #5. Clean datasets ----------------------------------------- -------------------
@@ -382,15 +391,16 @@ create_agg_data_default <- function(data, agg_years = c(1, 3, 5)) {
 }
 
 # Example usage
-agg_dt_default <- clean_dt %>% 
-  filter(nchar(FiscalYear) == 9) %>% 
-  create_agg_data_default()
+# agg_dt_default <- clean_dt %>% 
+#   filter(nchar(FiscalYear) == 9) %>% 
+#   create_agg_data_default()
 
 
 #6.2 Case 2: August 2017-July 2018 ---------------------------------------------
 ## To handle cases where time period is in this format: August 2017-July 2018
+# Old function name: create_agg_data_for_mmyyyy_dt
 
-create_agg_data_for_mmyyyy_dt <- function(data, agg_years = c(1, 3, 5)) {
+create_agg_data_for_fixed_period <- function(data, agg_years = c(1, 3, 5)) {
   aggregated_data <- list()
   
   for (year in agg_years) {
@@ -477,15 +487,17 @@ create_agg_data_for_mmyyyy_dt <- function(data, agg_years = c(1, 3, 5)) {
 
 
 # Example usage
-agg_dt_mmyyyy <- clean_dt %>% 
-  filter(nchar(FiscalYear) > 9) %>% 
-  create_agg_data_for_mmyyyy_dt() 
+# Will return 0 obs if the original data doesn't have fixed time period
+# agg_dt_fixed_period <- clean_dt %>% 
+#   filter(nchar(FiscalYear) > 9) %>% 
+#   create_agg_data_for_fixed_period() 
 
 
 ## Case 3: YYYY format ---------------------------------------------------------
 ## Handle cases where Fiscal Year is calendar year format
+# Old function name: create_agg_data_for_yyyy
 
-create_agg_data_for_yyyy <- function(data, agg_years = c(1, 3, 5)) {
+create_agg_data_for_calendar_yr<- function(data, agg_years = c(1, 3, 5)) {
   aggregated_data <- list()
   
   for (year in agg_years) {
@@ -567,9 +579,10 @@ create_agg_data_for_yyyy <- function(data, agg_years = c(1, 3, 5)) {
 }
 
 # Example Usage
-agg_dt_yyyy <- clean_dt %>% 
-  filter(nchar(TimePeriod) == 4) %>% 
-  create_agg_data_for_yyyy() 
+# Will return 0 obs if the original data doesn't have calendar year
+# agg_dt_calendar_yr<- clean_dt %>% 
+#   filter(nchar(TimePeriod) == 4) %>% 
+#   create_agg_data_for_calendar_yr() 
 
 # 6.3 Combine aggregate functions ----------------------------------------------
 
@@ -585,7 +598,7 @@ create_aggregate_data <- function(data) {
     if (length == 4) {
       agg_dt <- data %>%
         filter(nchar(FiscalYear) == 4) %>%
-        create_agg_data_for_yyyy()
+        create_agg_data_for_calendar_yr()
     } else if (length == 9) {
       agg_dt <- data %>%
         filter(nchar(FiscalYear) == 9) %>%
@@ -593,7 +606,7 @@ create_aggregate_data <- function(data) {
     } else if (length > 9) {
       agg_dt <- data %>%
         filter(nchar(FiscalYear) > 9) %>%
-        create_agg_data_for_mmyyyy_dt()
+        create_agg_data_for_fixed_period()
     } else {
       stop("Invalid FiscalYear format detected.")
     }
@@ -610,7 +623,7 @@ create_aggregate_data <- function(data) {
 
 
 #7. Function to create grouping columns ----------------------------------------
-# Columns to group data by for calculating Only overall crude rates and rates by ethnicity
+# Columns to group the data by, for calculating Only overall crude rates and rates by ethnicity
 
 get_grouping_columns <- function(rate_type, rate_level) {
   base_group_vars <- c("IndicatorID", "ReferenceID", "FiscalYear")
@@ -640,9 +653,10 @@ get_grouping_columns <- function(rate_type, rate_level) {
 }
 
 # Example usage
-get_grouping_columns(rate_type = "overall", rate_level = "Locality")
+get_grouping_columns(rate_type = "overall", rate_level = "Locality") # Output: "IndicatorID"  "ReferenceID"  "FiscalYear"   "Locality_Reg"
 
 # 8. Function to calculate crude rate ------------------------------------------
+##8.1 Helper base function to calculate crude rate -----------------------------
 
 calculate_crude_rate <- function(data, group_vars, aggYear = c(1, 3, 5), rate_level, rate_type, ageGrp, genderGrp, multiplier = 100000) {
     
@@ -669,7 +683,7 @@ calculate_crude_rate <- function(data, group_vars, aggYear = c(1, 3, 5), rate_le
                   .groups = 'drop') %>%
         mutate(
           OriginalSign = sign(Numerator),  # Capture the original sign of Numerator
-          Numerator = abs(Numerator) # Get the absolute number to handle negative numerators
+          Numerator = abs(Numerator) # Get the absolute number to handle negative numerators (such as Excess Winter death index)
         ) %>% 
         mutate(
           Numerator = ifelse(is.na(Numerator) | Denominator == 0, 0, Numerator),
@@ -716,12 +730,12 @@ calculate_crude_rate <- function(data, group_vars, aggYear = c(1, 3, 5), rate_le
           IMD = NA_character_,
           EthnicityCode = if (rate_type == "ethnicity") ONSGroup else NA_character_,  # Directly assign ONSGroup
           IndicatorStartDate = case_when(
-            nchar(FiscalYear) == 15 ~ extract_and_format_dates(FiscalYear)$start_date,
+            nchar(FiscalYear) == 15 ~ extract_start_and_end_date_from_fixed_period(FiscalYear)$start_date,
             nchar(FiscalYear) == 9 ~ extract_start_and_end_date_from_fiscal_year(FiscalYear)$start_date,
             TRUE ~ NA
           ),
           IndicatorEndDate = case_when(
-            nchar(FiscalYear) == 15 ~ extract_and_format_dates(FiscalYear)$end_date,
+            nchar(FiscalYear) == 15 ~ extract_start_and_end_date_from_fixed_period(FiscalYear)$end_date,
             nchar(FiscalYear) == 9 ~ extract_start_and_end_date_from_fiscal_year(FiscalYear)$end_date,
             TRUE ~ NA
           ),
@@ -743,7 +757,7 @@ calculate_crude_rate <- function(data, group_vars, aggYear = c(1, 3, 5), rate_le
     return(output)
   }
 
-# This is to calculate rates for indicators depending on the indicator level
+#8.2 Final function to calculate crude rate depending on the rate level ---------
 process_dataset <- function(clean_data, ageGrp, genderGrp) {
   
   # Step 1: Aggregate the data
@@ -828,8 +842,9 @@ process_dataset <- function(clean_data, ageGrp, genderGrp) {
 }
 
 # Example usage
+# Ensure you've extracted this indicator data from the database first
 process_dataset(clean_data = clean_dt %>% 
-                                  filter(IndicatorID == 1), # Ensure you've extracted this indicator data from the database first
+                                  filter(IndicatorID == 1), 
                                 ageGrp = "35+ yrs", 
                                 genderGrp = "Persons") 
 
@@ -890,6 +905,21 @@ results <- indicator_params %>%
   ungroup() # Remove the rowwise grouping, so the output is a simple tibble
 
 
+# Optional ---------------------------------------------------------------------
+# Can use the following process_dataset directly if you already know which indicator
+# you want to process, and the parameters for age group and gender group for that indicator
+
+# Requirements:
+#1. Must use cleansed data, containing the indicator you want to process
+#2. Specify the age group parameter
+#3. Specify the gender group parameter
+#4. Use the 'processed_dataset' variable to write the data into database
+
+processed_dataset <- process_dataset(clean_data = clean_dt %>% filter(IndicatorID == 1), 
+                                     ageGrp = "35+ yrs", 
+                                     genderGrp = "Persons") 
+
+
 # Write into database ----------------------------------------------------------
 
 sql_connection <-
@@ -901,7 +931,11 @@ sql_connection <-
     Trusted_Connection = "True"
   )
 
-# Overwrite the existing table
+# Overwrite / append the data to the existing table
+# Only overwrite if you re-process ALL indicators
+# Only append if you want to add new indicators to the existing table without dropping the
+# rest of the already processed indicators from this table
+
 dbWriteTable(
   sql_connection,
   Id(schema = "dbo", table = "BSOL_0033_OF_Crude_Rates_Predefined_Denominators_v2"),
