@@ -63,7 +63,6 @@ dt <- data
 #4. Functions to transform  time periods ---------------------------------------
 ##4.1 Function to convert time period in YYYYMM format to its Fiscal Year ------
 ## E.g., 202204 to 2022/2023
-## old function name: convert_yyyymm_to_fiscal_yr
 
 convert_yearmonth_period<- function(yyyymm) {
   # Extract the year and month from the input
@@ -86,8 +85,7 @@ print(fiscal_years) # Output: "2021/2022" "2022/2023" "2022/2023"
                     #         "2022/2023" "2022/2023" "2022/2023" "2023/2024" "2024/2025"
 
 ##4.2 Function to convert time period in MM YYYY - MM YYYY format --------------
-##e.g., August 2014-July 2015 to 08/2014-07/2015
-## old function name: convert_to_mm_yyyy
+##E.g., August 2014-July 2015 to 08/2014-07/2015
 
 convert_fixed_period <- function(date_range) {
   # Create a named vector for month conversion
@@ -129,7 +127,6 @@ print(formatted_dates) # Output: "08/2014-07/2015", "08/2015-07/2016", "08/2016-
 
 ##4.3 Function to convert time period in 'To MM YYYY' format to its Fiscal Year -------
 ##E.g., To December 2022 to 2022/2023
-## old function name: convert_to_fiscal_year
 
 convert_quarterly_period <- function(time_period) {
     # Extract the month and year from the input
@@ -156,8 +153,7 @@ time_periods <- c("To December 2022", "To December 2023", "To June 2022",
                     "To September 2022", "To September 2023")
 
 fiscal_years <- sapply(time_periods, convert_quarterly_period)
-print(fiscal_years) # Output: "2022/2023", "2023/2024", "2022/2023", "2023/2024",
-                    #         "2021/2022", "2022/2023", "2023/2024", "2022/2023", "2023/2024"
+print(fiscal_years) # Output: "2022/2023", "2023/2024", "2022/2023", "2023/2024", "2021/2022", "2022/2023", "2023/2024", "2022/2023", "2023/2024"
   
 ##4.4 Function to convert time period in "YYYY-MM" or "YYYY/MM" to its Fiscal Year --------------
 ## E.g., 2022-23 to 2022/2023 or 2022/23 to 2022/2023
@@ -236,8 +232,7 @@ updated_dt %>%
 
 ##4.6 Function to extract start and end dates separated by "/" -----------------
 # This is used to get the start date and end date from the Fiscal Year in this format:
-# 01-2021/12-2022 or 08-2022/07-2023
-# Old function: extract_and_format_dates
+# E.g., 01-2021/12-2022 or 08-2022/07-2023
 
 extract_start_and_end_date_from_fixed_period <- function(date_string) {
   # Split the string by "/" to get start and end parts
@@ -262,11 +257,11 @@ extract_start_and_end_date_from_fixed_period <- function(date_string) {
 # Example usage
 date_string <- "08-2012/07-2013"
 
-extract_start_and_end_date_from_fixed_period(date_string)$start_date # start_date // Output: "01-08-2012"
-extract_start_and_end_date_from_fixed_period(date_string)$end_date # end_date // Output: "31-07-2013"
+extract_start_and_end_date_from_fixed_period(date_string)$start_date # Output: "01-08-2012"
+extract_start_and_end_date_from_fixed_period(date_string)$end_date   # Output: "31-07-2013"
 
 # This is used to extract start date and end date from Fiscal Year in this format
-# 2023/2024 where the start is 1st April and end is 31st March
+# E.g., 2023/2024 where the start is 1st April and end is 31st March
 
 extract_start_and_end_date_from_fiscal_year <- function(fiscal_year) {
   # Split the fiscal year string by "/"
@@ -293,8 +288,8 @@ extract_start_and_end_date_from_fiscal_year <- function(fiscal_year) {
 }
 
 # Example usage
-extract_start_and_end_date_from_fiscal_year("2023/2024")$start_date # Start date // Output: "01-04-2023"
-extract_start_and_end_date_from_fiscal_year("2023/2024")$end_date # End date // Output: "31-03-2024"
+extract_start_and_end_date_from_fiscal_year("2023/2024")$start_date # Output: "01-04-2023"
+extract_start_and_end_date_from_fiscal_year("2023/2024")$end_date   # Output: "31-03-2024"
 
 
 #5. Clean datasets ----------------------------------------- -------------------
@@ -398,7 +393,6 @@ create_agg_data_default <- function(data, agg_years = c(1, 3, 5)) {
 
 #6.2 Case 2: August 2017-July 2018 ---------------------------------------------
 ## To handle cases where time period is in this format: August 2017-July 2018
-# Old function name: create_agg_data_for_mmyyyy_dt
 
 create_agg_data_for_fixed_period <- function(data, agg_years = c(1, 3, 5)) {
   aggregated_data <- list()
@@ -495,7 +489,6 @@ create_agg_data_for_fixed_period <- function(data, agg_years = c(1, 3, 5)) {
 
 ## Case 3: YYYY format ---------------------------------------------------------
 ## Handle cases where Fiscal Year is calendar year format
-# Old function name: create_agg_data_for_yyyy
 
 create_agg_data_for_calendar_yr<- function(data, agg_years = c(1, 3, 5)) {
   aggregated_data <- list()
@@ -910,7 +903,7 @@ results <- indicator_params %>%
 # you want to process, and the parameters for age group and gender group for that indicator
 
 # Requirements:
-#1. Must use cleansed data, containing the indicator you want to process
+#1. Must use cleansed data (see Step 5), containing the indicator you want to process
 #2. Specify the age group parameter
 #3. Specify the gender group parameter
 #4. Use the 'processed_dataset' variable to write the data into database
