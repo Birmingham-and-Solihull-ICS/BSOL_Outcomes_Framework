@@ -26,7 +26,7 @@ con <-
 #2. Get data from database -------------------------------------------------------
 
 # Insert which indicator IDs to extract
-indicator_ids <- c(1, 2, 3, 4, 16)
+indicator_ids <- c(90, 93)
 
 # Convert the indicator IDs to a comma-separated string
 indicator_ids_string <- paste(indicator_ids, collapse = ", ")
@@ -60,6 +60,7 @@ data <- data %>%
 # Create a copy of data to work with
 dt <- data
 
+
 #4. Functions to transform  time periods ---------------------------------------
 ##4.1 Function to convert time period in YYYYMM format to its Fiscal Year ------
 ## E.g., 202204 to 2022/2023
@@ -77,6 +78,9 @@ convert_yearmonth_period<- function(yyyymm) {
   fiscal_year <- paste0(start_year, "/", end_year)
   return(fiscal_year)
 }
+
+# Vectorize the function for use with dplyr
+convert_yearmonth_period <- Vectorize(convert_yearmonth_period)
 
 # Example usage
 months <- c(202203, 202204, 202205, 202206, 202301, 202303, 202304, 202407)
@@ -185,31 +189,31 @@ parse_fiscal_year("2024/25") # Output: "2024/2025"
 ##4.5 Process time periods altogether in the dataset -------------------------------
 
 process_time_periods <- function(data) {
-    # Process the 'Month' data
-    month_data <- data %>%
-      filter(TimePeriodDesc == "Month") %>%
-      mutate(FiscalYear = convert_yearmonth_period(TimePeriod))
-    
-    # Process the 'Other' data
-    other_data <- data %>%
-      filter(TimePeriodDesc == "Other") %>%
-      mutate(FiscalYear = case_when(
-        grepl("-", TimePeriod) ~ convert_fixed_period(TimePeriod),
-        grepl("To", TimePeriod) ~ convert_quarterly_period(TimePeriod),
-        TRUE ~ TimePeriod
-      ))
-    
-    # Process the 'Financial Year' data
-    fy_data <- data %>%
-      filter(TimePeriodDesc == "Financial Year") %>%
-      mutate(FiscalYear = parse_fiscal_year(TimePeriod))
-    
-    # Combine the processed data back together
-    combined_data <- bind_rows(month_data, other_data, fy_data)
-    
-    return(combined_data)
-  }
+  # Process the 'Month' data
+  month_data <- data %>%
+    filter(TimePeriodDesc == "Month") %>%
+    mutate(FiscalYear = as.character(convert_yearmonth_period(TimePeriod)))
   
+  # Process the 'Other' data
+  other_data <- data %>%
+    filter(TimePeriodDesc == "Other") %>%
+    mutate(FiscalYear = case_when(
+      grepl("-", TimePeriod) ~ as.character(convert_fixed_period(TimePeriod)),
+      grepl("To", TimePeriod) ~ as.character(convert_quarterly_period(TimePeriod)),
+      TRUE ~ as.character(TimePeriod)
+    ))
+  
+  # Process the 'Financial Year' data
+  fy_data <- data %>%
+    filter(TimePeriodDesc == "Financial Year") %>%
+    mutate(FiscalYear = as.character(parse_fiscal_year(TimePeriod)))
+  
+  # Combine the processed data back together
+  combined_data <- bind_rows(month_data, other_data, fy_data)
+  
+  return(combined_data)
+}
+
 
 updated_dt <- process_time_periods(dt)
 
@@ -836,10 +840,10 @@ process_dataset <- function(clean_data, ageGrp, genderGrp) {
 
 # Example usage
 # Ensure you've extracted this indicator data from the database first
-process_dataset(clean_data = clean_dt %>% 
-                                  filter(IndicatorID == 1), 
-                                ageGrp = "35+ yrs", 
-                                genderGrp = "Persons") 
+# process_dataset(clean_data = clean_dt %>% 
+#                                   filter(IndicatorID == 1), 
+#                                 ageGrp = "35+ yrs", 
+#                                 genderGrp = "Persons") 
 
 
 
@@ -908,9 +912,9 @@ results <- indicator_params %>%
 #3. Specify the gender group parameter
 #4. Use the 'processed_dataset' variable to write the data into database
 
-processed_dataset <- process_dataset(clean_data = clean_dt %>% filter(IndicatorID == 1), 
-                                     ageGrp = "35+ yrs", 
-                                     genderGrp = "Persons") 
+# processed_dataset <- process_dataset(clean_data = clean_dt %>% filter(IndicatorID == 1), 
+#                                      ageGrp = "35+ yrs", 
+#                                      genderGrp = "Persons") 
 
 
 # Write into database ----------------------------------------------------------
