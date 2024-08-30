@@ -1,3 +1,17 @@
+
+##########################INSTRUCTIONS##########################################################
+# 1. Go to Step 2: Get data from database                                                     ##
+# 2. Insert the indicator ID that you wish to extract data from database                      ##  
+# 3. If you want to process one indicator at a time:                                          ## 
+#     - Run the code from the beginning until Step 9.1                                        ## 
+#     - Ensure that you specify the parameters for that indicator                             ## 
+#     - And the clean_data contains the indicator ID that you wish to process                 ## 
+#     - If necessary, filter the indicator_data to include the relevant indicator ID          ## 
+# 4. If you want to process multiple indicators at the same time:                             ## 
+#    - Ensure that you've filled in the parameter_combinations.xlsx file with the indicators  ## 
+#    - Run the code from the beginning until Step 9.2 (skip Step 9.1)                         ## 
+################################################################################################
+
 library(tidyverse)
 library(janitor)
 library(DBI)
@@ -592,15 +606,15 @@ create_aggregate_data <- function(data) {
   
   # Loop over each unique fiscal year length and apply the appropriate function
   for (length in fiscal_year_lengths) {
-    if (length == 4) {
+    if (length == 4) { 
       agg_dt <- data %>%
         filter(nchar(FiscalYear) == 4) %>%
         create_agg_data_for_calendar_yr()
-    } else if (length == 9) {
+    } else if (length == 9) { 
       agg_dt <- data %>%
         filter(nchar(FiscalYear) == 9) %>%
         create_agg_data_default()
-    } else if (length > 9) {
+    } else if (length > 9){
       agg_dt <- data %>%
         filter(nchar(FiscalYear) > 9) %>%
         create_agg_data_for_fixed_period()
@@ -755,7 +769,7 @@ calculate_crude_rate <- function(data, group_vars, aggYear = c(1, 3, 5), rate_le
   }
 
 #8.2 Final function to calculate crude rate depending on the rate level ---------
-process_dataset <- function(clean_data, ageGrp, genderGrp) {
+process_dataset <- function(clean_data, ageGrp, genderGrp, multiplier = 100000) {
   
   # Step 1: Aggregate the data
   aggregated_data <- create_aggregate_data(clean_data)
@@ -771,7 +785,7 @@ process_dataset <- function(clean_data, ageGrp, genderGrp) {
       rate_type = "overall", 
       ageGrp = ageGrp, 
       genderGrp = genderGrp,
-      multiplier = 100000
+      multiplier = multiplier
     )
     
     # Ethnicity rate
@@ -783,7 +797,7 @@ process_dataset <- function(clean_data, ageGrp, genderGrp) {
       rate_type = "ethnicity", 
       ageGrp = ageGrp, 
       genderGrp = genderGrp,
-      multiplier = 100000
+      multiplier = multiplier
     )
     
     return(list(rate_overall = rate_overall, rate_ethnicity = rate_ethnicity))
@@ -848,6 +862,21 @@ process_dataset <- function(clean_data, ageGrp, genderGrp) {
 
 
 #9. Process each row of parameter combinations ---------------------------------
+##9.1 Process one indicator at a time ------------------------------------------
+# Can use the following process_dataset directly if you already know which indicator
+# you want to process, and the parameters for age group and gender group for that indicator
+
+# Requirements:
+#1. Must use cleansed data (see Step 5), containing the indicator you want to process
+#2. Specify the age group parameter
+#3. Specify the gender group parameter
+#4. Use the 'processed_dataset' variable to write the data into database (Step 10)
+
+processed_dataset <- process_dataset(clean_data = clean_dt %>% filter(IndicatorID == 90),
+                                     ageGrp = "All ages",
+                                     genderGrp = "Persons")
+
+##9.2 Process multiple indicators at the same time -----------------------------
 
 # Read the Excel file to get the available indicators
 parameter_combinations <- readxl::read_excel("data/parameter_combinations.xlsx", 
@@ -902,22 +931,7 @@ results <- indicator_params %>%
   ungroup() # Remove the rowwise grouping, so the output is a simple tibble
 
 
-# Optional ---------------------------------------------------------------------
-# Can use the following process_dataset directly if you already know which indicator
-# you want to process, and the parameters for age group and gender group for that indicator
-
-# Requirements:
-#1. Must use cleansed data (see Step 5), containing the indicator you want to process
-#2. Specify the age group parameter
-#3. Specify the gender group parameter
-#4. Use the 'processed_dataset' variable to write the data into database
-
-# processed_dataset <- process_dataset(clean_data = clean_dt %>% filter(IndicatorID == 1), 
-#                                      ageGrp = "35+ yrs", 
-#                                      genderGrp = "Persons") 
-
-
-# Write into database ----------------------------------------------------------
+#10. Write into database ----------------------------------------------------------
 
 sql_connection <-
   dbConnect(

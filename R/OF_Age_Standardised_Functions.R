@@ -73,7 +73,7 @@ parameter_combinations <- read_excel("data/parameter_combinations.xlsx",
 # Filter based on indicators requiring age-standardization
 indicators_params <- parameter_combinations %>% 
   filter(StandardizedIndicator == 'Y' & PredeterminedDenominator == "N") %>%   # The flag used to choose which indicators 
-  filter(IndicatorID %in% c(114))
+  filter(IndicatorID %in% c(10, 109, 115))
 
 # Get the unique indicator IDs to be used for importing data from database
 indicator_ids <- unique(indicators_params$IndicatorID)
@@ -689,23 +689,28 @@ results <- indicators_params %>% # Filtered to indicators requiring age-standard
 ## use Excel file as you already know the indicator parameters
 
 my_numerator <- get_numerator(indicator_data = indicator_data,
-                              indicator_id = 114,
-                              reference_id = 41401,
-                              min_age = 65,
+                              indicator_id = 10,
+                              reference_id = 21001,
+                              min_age = NA,
                               max_age = NA)
 
 my_denominator <- get_denominator(pop_estimates = popfile_ward,
                                   numerator_data = my_numerator)
 
 result <- calculate_age_std_rate(
-  indicator_id = 114,
+  indicator_id = 10,
   denominator_data = my_denominator,
   numerator_data = my_numerator,
   aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
   genderGrp = "Persons",
-  ageGrp = "65+ yrs",
+  ageGrp = "All ages",
   multiplier = 100000
 )
+
+results %>% 
+  filter(IndicatorID == 115) %>% 
+  View()
+
 
 # Use 'result' variable to write the data into the database
 

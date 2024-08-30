@@ -1,3 +1,19 @@
+
+##########################INSTRUCTIONS##########################################################
+# 1. Go to Step 3: Get numerator data                                                         ##
+# 2. Insert the indicator ID that you wish to extract data from database                      ##  
+# 3. If you want to process one indicator at a time:                                          ## 
+#     - Run the code from the beginning until Step 6.1                                        ## 
+#     - Ensure that you specify the parameters for that indicator                             ## 
+#     - And the indicator_data contains the indicator ID that you wish to process             ## 
+#     - If necessary, filter the indicator_data to include the relevant indicator ID          ## 
+# 4. If you want to process multiple indicators at the same time:                             ## 
+#    - Ensure that you've filled in the parameter_combinations.xlsx file with the indicators  ## 
+#    - Run the code from the beginning until Step 6.2 (skip Step 6.1)                         ## 
+################################################################################################
+
+
+
 library(tidyverse)
 library(janitor)
 library(DBI)
@@ -68,24 +84,32 @@ popfile_ward <- read.csv("data/C21_a86_e20_ward.csv", header = TRUE, check.names
 #3. Get numerator data ---------------------------------------------------------
 #3.1 Load the indicator data from the warehouse --------------------------------
 
-# Read the Excel file to get the available indicators
-parameter_combinations <- read_excel("data/parameter_combinations.xlsx", 
-                                     sheet = "crude_indicators")
+# # Read the Excel file to get the available indicators
+# parameter_combinations <- read_excel("data/parameter_combinations.xlsx", 
+#                                      sheet = "crude_indicators")
+# 
+# # Filter based on indicators requiring age-standardization
+# indicators_params <- parameter_combinations %>% 
+#   filter(StandardizedIndicator == 'N' & PredeterminedDenominator == "N") %>%  # The flag used to choose which indicators 
+#   filter(IndicatorID %in% c(32))
+# 
+# # Get the unique indicator IDs to be used for importing data from database
+# indicator_ids <- unique(indicators_params$IndicatorID)
+# 
+# # Convert the indicator IDs to a comma-separated values
+# indicator_ids <- paste(indicator_ids, collapse = ", ")
 
-# Filter based on indicators requiring age-standardization
-indicators_params <- parameter_combinations %>% 
-  filter(StandardizedIndicator == 'N' & PredeterminedDenominator == "N") %>%  # The flag used to choose which indicators 
-  filter(IndicatorID %in% c(32))
-# Get the unique indicator IDs to be used for importing data from database
-indicator_ids <- unique(indicators_params$IndicatorID)
+# Insert which indicator IDs to extract
+indicator_ids <- c(87, 88)
 
-# Convert the indicator IDs to a comma-separated values
-indicator_ids <- paste(indicator_ids, collapse = ", ")
+# Convert the indicator IDs to a comma-separated string
+indicator_ids_string <- paste(indicator_ids, collapse = ", ")
+
 
 # Construct the SQL query with the indicator IDs
 query <- paste0("SELECT *
                 FROM [EAT_Reporting_BSOL].[OF].[IndicatorData]
-                WHERE IndicatorID IN (", indicator_ids, ")")
+                WHERE IndicatorID IN (", indicator_ids_string, ")")
 
 # Execute the SQL query
 indicator_data <- dbGetQuery(con, query) %>% 
@@ -560,7 +584,51 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
 
 #6. Process all parameters -------------------------------------------------------
 
-## 6.1 Function 5: Apply functions to specific parameter combinations ----------
+## 6.1 Optional: Process one indicator at a time -------------------------------
+# Can use the following codes directly  if you already know which indicator
+# you want to process, and the parameters for that indicator
+
+# Requirements:
+#1. Must use indicator_data, containing the indicator you want to process (see Step 3: Get numerator data)
+#2. Specify the indicator id parameter
+#3. Specify the reference id parameter
+#4. Specify the min age group parameter
+#5. Specify the max age group parameter
+
+## Use 'result' variable to write the data into database (Step 7)
+
+my_numerator <- get_numerator(indicator_data = indicator_data,
+                                   indicator_id = 87,
+                                   min_age = NA,
+                                   max_age = 74)
+
+my_denominator <- get_denominator(min_age = NA,
+                                    max_age = 74,
+                                    pop_estimates = popfile_ward,
+                                    numerator_data = my_numerator)
+
+result <- calculate_crude_rate(
+  indicator_id = 87,
+  denominator_data = my_denominator,
+  numerator_data = my_numerator,
+  aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
+  genderGrp = "Persons",
+  ageGrp = "<75 yrs",
+  multiplier = 100000
+)
+
+
+## 6.2 Process several indicators altogether -----------------------------
+# Read the Excel file to get the available indicators
+parameter_combinations <- readxl::read_excel("data/parameter_combinations.xlsx", 
+                                             sheet = "crude_indicators")
+
+indicators_params <- parameter_combinations %>% 
+  filter(StandardizedIndicator == 'N' & PredeterminedDenominator == "N") %>% # Ensure we're taking the correct indicators
+  filter(IndicatorID %in% indicator_ids) # Ensure we're extracting parameters ONLY for indicators we've specified in the beginning, otherwise, error will occur.
+
+
+## Apply functions to specific parameter combinations 
 
 # Parameter:
 # row: the row of parameter combinations data
@@ -664,8 +732,8 @@ sql_connection <-
 dbWriteTable(
   sql_connection,
   Id(schema = "dbo", table = "BSOL_0033_OF_Crude_Rates"),
-  results,
-  append = TRUE
+  results, # Processed dataset
+  append = TRUE # Append data to the existing table
   # overwrite = TRUE
 )
 
