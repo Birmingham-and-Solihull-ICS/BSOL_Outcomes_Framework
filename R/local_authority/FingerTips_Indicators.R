@@ -4,7 +4,9 @@ library(data.table)
 library(readxl)
 
 # Load indicator list
-ids <- read.csv("../../data/LA_FingerTips_Indicators.csv")
+ids <- read_excel(
+  "../../data/LA_FingerTips_Indicators.xlsx",
+  sheet = "FT_indicators")
 
 # Load GP-PCN-Locality-LA lookup data
 GP_lookup <- read.csv("../../data/better-GP-lookup-march-2024.csv") %>%
@@ -16,13 +18,7 @@ GP_lookup <- read.csv("../../data/better-GP-lookup-march-2024.csv") %>%
 
 ## Data collection functions ##
 
-fetch_data <- function(FingerTips_id, AreaTypeID) {
-  # Fetch data from FingerTips using API
-  data <- fingertips_data(
-    AreaTypeID = AreaTypeID, 
-    IndicatorID = FingerTips_id
-  )
-  
+fetch_meta <- function(FingerTips_id) {
   meta_data <- indicator_metadata(
     IndicatorID = FingerTips_id
   ) %>%
@@ -30,13 +26,31 @@ fetch_data <- function(FingerTips_id, AreaTypeID) {
       `Source of numerator` = `Source of numerator...10`,
       `Source of denominator`  = `Source of denominator...12`,
       `External Reference` = Links,
-      `Rate Type` = `Value type`,
+      `Rate Type` = case_when(
+        `Value type` == "Proportion" ~ `Value type`,
+        grepl("rate", tolower(`Value type`)) ~ paste(`Value type`, "per", Unit)
+        ),
+      `Simple Definition` = case_when(
+        is.na(`Simple Definition`) ~ Definition,
+        TRUE ~ `Simple Definition`
+      ),
     ) %>%
     select(
       c(Caveats, `Definition of denominator`, `Definition of numerator`,
         `External Reference`, Polarity, `Simple Definition`,
-        `Source of numerator`, `Source of denominator`, Unit, Methodology)
+        `Source of numerator`, `Source of denominator`, Unit, Methodology,
+        `Rate Type`)
     )
+  return(meta_data)
+}
+
+fetch_data <- function(FingerTips_id, AreaTypeID) {
+  # Fetch data from FingerTips using API
+  data <- fingertips_data(
+    AreaTypeID = AreaTypeID, 
+    IndicatorID = FingerTips_id
+  )
+  meta_data <- fetch_meta(FingerTips_id)
   
   return(
     list("data" = data,"meta" = meta_data)
@@ -60,11 +74,13 @@ get_CI_method <- function(meta) {
   # Estimate the confidence interval method based on the methodology
   #   - Rates -> Byar's Method
   #   - Otherwise -> Wilson's
-  methodology = meta %>% pull("Methodology")
-  if (grepl("rate", tolower(methodology))) {
+  Value_type = meta %>% pull("Rate Type")
+  if (grepl("rate", tolower(Value_type))) {
     return("Byar's Method")
-  } else{
+  } else if (grepl("proportion", tolower(Value_type))){
     return("Wilson's Method")
+  } else {
+    stop(sprintf("Unexpected Value Type: %s",Value_type))
   }
 }
 
@@ -112,16 +128,16 @@ process_LA_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -192,16 +208,16 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -225,16 +241,16 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -258,16 +274,16 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -291,16 +307,16 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = p_hat + 0.5,
+      a_prime = Count + 0.5,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
     ungroup() %>%
@@ -332,11 +348,15 @@ start_date <- function(date) {
   # If financial year e.g. 2021/22
   if (grepl("^\\d{4}/\\d{2}$",date)) {
     Year_Start = stringr::str_extract(date,"^\\d{4}")
-    start_date <- as.Date(sprintf("%s/04/01", Year_Start))
+    start_date <- as.Date(
+      sprintf("%s/04/01", Year_Start),
+      format = "%Y/%m/%d")
   } 
   # If calendar year e.g. 2021
   else if (grepl("^\\d{4}$",date)) {
-    start_date <- as.Date(sprintf("%s/01/01", date))
+    start_date <- as.Date(
+      sprintf("%s/01/01", date),
+      format = "%Y/%m/%d")
   }
   # Otherwise raise error
   else{
@@ -350,11 +370,15 @@ end_date <- function(date) {
   # If financial year e.g. 2021/22
   if (grepl("^\\d{4}/\\d{2}$",date)) {
     Year_Start = stringr::str_extract(date,"^\\d{4}")
-    start_date <- as.Date(sprintf("%i/03/31", as.numeric(Year_Start) + 1 ))
+    start_date <- as.Date(
+      sprintf("%i/03/31", as.numeric(Year_Start) + 1 ),
+      format = "%Y/%m/%d")
   } 
   # If calendar year e.g. 2021
   else if (grepl("^\\d{4}$",date)) {
-    start_date <- as.Date(sprintf("%s/12/31", date))
+    start_date <- as.Date(
+      sprintf("%s/12/31", date), 
+      format = "%Y/%m/%d")
   }
   # Otherwise raise error
   else{
@@ -367,7 +391,7 @@ end_date <- function(date) {
 ##                Collect Data from FingerTips                 ##
 #################################################################
 
-
+print("------------- Collecting FingerTips data --------------")
 all_data <- list()
 all_meta <- list()
 
@@ -396,15 +420,40 @@ collected_data <- rbindlist(all_data)
 collected_meta <- rbindlist(all_meta)
 
 #################################################################
+##               Collect Additional Meta Data                  ##
+#################################################################
+print("------------- Collecting additional meta data --------------")
+meta_ids <- ids <- read_excel(
+  "../../data/LA_FingerTips_Indicators.xlsx",
+  sheet = "meta_only")
+# Get additional meta data
+additional_meta_list <- list()
+
+for (i in 1:nrow(meta_ids)) {
+  meta_data_i <- fetch_meta(meta_ids$FingerTips_ID[[i]])
+  meta_data_i$IndicatorID <- ids$IndicatorID[[i]]
+  additional_meta_list[[i]] <- meta_data_i
+}
+
+collected_additional_meta <- rbindlist(additional_meta_list) 
+
+#################################################################
 ##                Mutate into Staging Table                    ##
 #################################################################
-
+print("------------- Mutate into Staging Table --------------")
 # Load ID lookup tables
+
+meta <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Meta"
+)
 
 demographics <- readxl::read_excel(
   "../../data/OF-Other-Tables.xlsx",
   sheet = "Demographic"
 ) %>% 
+  # Remove repeated entry for "Persons: <18 yrs"
+  filter(DemographicID != 7623) %>%
   select(c(DemographicID, DemographicLabel))
 
 aggregations <- readxl::read_excel(
@@ -458,10 +507,50 @@ output_data <- collected_data %>%
     )
   )
 
-# Process meta data
 
-output_meta <- collected_meta %>%
-  select(-c(Unit, Methodology)) %>%
+# Load simple definition write-ups
+simple_defs <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Definitions"
+) %>%
+  filter(Definition != "Duplicate") %>%
+  mutate(WrittenDefinition = SimpleDefinition) %>%
+  select(c(IndicatorID, WrittenDefinition))
+
+# Process meta data
+output_meta <- collected_meta %>% 
+  rbind(collected_additional_meta) %>%
+  left_join(
+    simple_defs, 
+    join_by(IndicatorID),
+    relationship = "one-to-one"
+    ) %>%
+  mutate(
+    `Simple Definition` = case_when(
+      is.na(WrittenDefinition) ~ `Simple Definition`,
+      TRUE ~ `Simple Definition`,
+    ),
+    # Update LARC caveats text
+    Caveats = case_when(
+      IndicatorID == 130 ~ paste(
+        "Solihull data currently unavailable.", 
+        Caveats
+      ),
+      IndicatorID %in% c(118,119) ~ "Indicator presented as the mortality rate per 1,000. This is different to FingerTips which gives the equivalenct indicator as a mortality ratio.",
+      TRUE ~ Caveats
+    ),
+    # Update NDTMS denominator Definition
+    `Definition of denominator` = case_when(
+      IndicatorID == 118 ~ "The number of adults in drug treatment in the local authority.",
+      IndicatorID == 119 ~ "The number of adults in alcohol treatment in the local authority.",
+      TRUE ~ `Definition of numerator`
+    ),
+    `Rate Type` = case_when(
+      IndicatorID %in% c(118,119) ~ "Rate per 1,000",
+      TRUE ~ `Rate Type`
+    )
+  ) %>%
+  select(-c(Unit, Methodology, WrittenDefinition)) %>%
   tidyr::pivot_longer(
     cols=-IndicatorID,
     names_to='ItemLabel',
@@ -469,17 +558,13 @@ output_meta <- collected_meta %>%
   left_join(
     meta,
     join_by(ItemLabel)) %>%
-  select(c(IndicatorID,ItemID,MetaValue))
+  select(c(IndicatorID,ItemID,MetaValue)) %>%
+  arrange(IndicatorID, ItemID)
 
 #################################################################
 ##                     Save final output                       ##
 #################################################################
-
-# Filter out irregular indicator demographic
-output_data <- output_data %>%
-  filter(
-    !(is.na(DemographicID) & IndicatorID == 47)
-  )
+print("------------- Save final output  --------------")
 
 # Save data
 write.csv(
