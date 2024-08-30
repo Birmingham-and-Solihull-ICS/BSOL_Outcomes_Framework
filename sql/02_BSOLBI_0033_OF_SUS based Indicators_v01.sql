@@ -656,7 +656,117 @@ GROUP BY		T1.EpisodeId
 
 
 /*==================================================================================================================================================================
-ReferenceID  21001 - Emergency Hospital Admissions for Intentional Self-Harm
+IndicatorID  115
+ReferenceID  90813 - Hospital admissions as a result of self-harm (10-24 years)
+
+Number of finished admission episodes in children aged between 10 and 24 years 
+where the main recorded cause (defined as the first diagnosis code that represents an external cause (V01-Y98)) is between X60 and X84 (Intentional self-harm)
+=================================================================================================================================================================*/
+
+INSERT INTO		#BSOL_OF_tbStaging_NumeratorData
+(				ReferenceID
+,				EpisodeID
+,				Numerator
+)
+
+(
+SELECT			'90813'							AS [ReferenceID]
+,				T1.EpisodeId
+,				SUM(1)							AS [Numerator]	
+
+FROM			#BSOL_OF_tbIndicator_PtsCohort_IP T1
+
+INNER JOIN		EAT_Reporting.dbo.tbIpDiagnosisRelational T2
+ON				T1.EpisodeId = T2.EpisodeID	
+
+INNER JOIN		EAT_Reporting.dbo.tbInpatientEpisodes T3
+ON				T1.EpisodeID = T3.EpisodeId
+
+WHERE			1=1
+AND				T3.OrderInSpell =1														--First Episode in Spell
+AND				LEFT(T2.DiagnosisCode,3) IN ('X60','X61','X62','X63','X64','X66','X67','X68','X69'
+						,'X70','X71','X72','X73','X74','X75','X76','X77','X78','X79'
+						,'X80','X81','X82','X83','X84')                                 --Self Harm
+AND				AgeOnAdmission >= 10													--10-24 years
+AND				AgeOnAdmission <25														--10-24 years
+
+GROUP BY		T1.EpisodeId
+
+)
+
+
+
+/*==================================================================================================================================================================
+ReferenceID  93764 - Admission episodes for alcohol-related conditions (Narrow)
+IndicatorID  59
+
+Admissions to hospital where the primary diagnosis is an alcohol-attributable code or a secondary diagnosis is an alcohol-attributable external cause code. 
+Directly age standardised rate per 100,000 population (standardised to the European standard population).
+
+Alcohol-related hospital admissions are used as a way of understanding the impact of alcohol on the health of a population.  
+There are two measures used in LAPE and elsewhere to assess this burden: the Broad and the Narrow measure.
+
+Narrow definition: A measure of hospital admissions where the primary diagnosis (main reason for admission) is an alcohol-related condition.  
+This represents a Narrower measure. Since every hospital admission must have a primary diagnosis it is less sensitive to coding practices but may also understate the part alcohol plays in the admission.
+
+In general, the Broad measure gives an indication of the full impact of alcohol on hospital admissions and the burden placed on the NHS. 
+The Narrow measure estimates the number of hospital admissions which are primarily due to alcohol consumption and provides the best indication of trends in alcohol-related hospital admissions.
+
+
+More specifically, hospital admissions records are identified where the admission is a finished episode [epistat = 3]; 
+the admission is an ordinary admission, day case or maternity [classpat = 1, 2 or 5];
+it is an admission episode [epiorder = 1];
+the sex of the patient is valid [sex = 1 or 2];
+there is a valid age at start of episode [startage between 0 and 150 or between 7001 and 7007];
+the region of residence is one of the English regions, no fixed abode or unknown [resgor<= K or U or Y];
+the episode end date [epiend] falls within the financial year, 
+and an alcohol-attributable ICD10 code appears in the primary diagnosis field [diag_01] or an alcohol-related external cause code appears in any diagnosis field [diag_nn].
+
+Wholly Attributable ICD10 codes
+https://assets.publishing.service.gov.uk/media/5ee9e2ebd3bf7f1eb35c30f5/APPEND_3-update.pdf
+
+=================================================================================================================================================================*/
+
+INSERT INTO		#BSOL_OF_tbStaging_NumeratorData
+(				ReferenceID
+,				EpisodeID
+,				Numerator
+)
+
+(
+SELECT			'93764'							AS [ReferenceID]
+,				T1.EpisodeId
+,				SUM(1)							AS [Numerator]	
+
+FROM			#BSOL_OF_tbIndicator_PtsCohort_IP T1
+
+INNER JOIN		EAT_Reporting.dbo.tbIpDiagnosisRelational T2
+ON				T1.EpisodeId = T2.EpisodeID	
+
+INNER JOIN		EAT_Reporting.dbo.tbInpatientEpisodes T3
+ON				T1.EpisodeID = T3.EpisodeId
+
+WHERE			1=1
+AND				T3.OrderInSpell = 1														    --First Episode in Spell
+AND				T2.DiagnosisOrder = 1														--Primary Diagnosis	
+AND				T3.AdmissionMethodCode IN (1,2,5)											--AdmissionMethodCode
+AND				T2.DiagnosisCode IN ('E244','F100','F101','F102','F103','F104','F105','F106','F107','F108','F109'
+									,'G312','G621','B721','I426','K292','K700','K701','K702','K703','K704','K705'
+									,'K706','K707','K708','K709','K860','T510','T511','T519','X450','X451','X452'
+									,'X453','X454','X455','X456','X457','X458','X459','X650','X651','X652','X653'
+									,'X654','X655','X656','X657','X658','X659','Y150','Y151','Y152','Y153','Y154'
+									,'Y155','Y156','Y157','Y158','Y159','K852','Q860','R780','Y900','Y901','Y902'
+									,'Y903','Y904','Y905','Y906','Y907','Y908','Y909','Y910','Y911','Y912','Y913'
+									,'Y914','Y915','Y916','Y917','Y918','Y919')				--Wholly attributable conditions
+
+GROUP BY		T1.EpisodeId
+
+)
+
+
+/*=================================================================================================
+IndicatorID: 10
+ReferenceID: 21001	Emergency Hospital Admissions for Intentional Self-Harm
 
 The number of first finished emergency admission episodes in patients (episode number equals 1, admission method starts with 2), 
 with a recording of self harm by cause code (ICD10 X60 to X84) in financial year in which episode ended. 
@@ -664,8 +774,10 @@ Regular and day attenders have been excluded. Regions are the sum of the Local A
 and admissions coded as U (England NOS).
 
 Numerator Extraction: Emergency Hospital Admissions for Intentional Self Harm. Counts of first finished consultant episodes with an external cause of intentional self harm 
-and an emergency admission method were extracted from HES. First finished consultant episode counts (excluding regular attenders) were summed in an excel pivot table filtered for emergency admission method 
+and an emergency admission method were extracted from HES. 
+First finished consultant episode counts (excluding regular attenders) were summed in an excel pivot table filtered for emergency admission method 
 and separated by quinary age for all ages, sex and local authority in the respective financial year. 
+
 Self harm is defined by external cause codes (ICD10 X60 to X84) which include: 
 • Intentional self poisoning (X60 to X69 inclusive), 
 • Intentional self harm by hanging, drowning or jumping (X70, X71 and X80), 
@@ -677,7 +789,9 @@ Please note this definition does not include events of undetermined intent.
 Numerator Aggregation or allocation: Local Authority of residence of each Finished Admission Episode is allocated by HES. 
 Values for England, Regions, Counties, Centres, Deprivation deciles and ONS cluster groups are aggregates of these. 
 Data for Isles of Scilly and City of London have been aggregated with Cornwall and Hackney respectively in order to prevent possible disclosure and disclosure by differencing.
-=================================================================================================================================================================*/
+			
+=================================================================================================*/
+
 
 INSERT INTO		#BSOL_OF_tbStaging_NumeratorData
 (				ReferenceID
@@ -699,16 +813,14 @@ INNER JOIN		EAT_Reporting.dbo.tbInpatientEpisodes T3
 ON				T1.EpisodeID = T3.EpisodeId
 
 WHERE			1=1
-AND 			LEFT(T3.AdmissionMethodCode,1) = 2										--Emergency Admissions
+AND				LEFT(T3.AdmissionMethodCode,1) = 2										--Emergency admissions
 AND				T3.OrderInSpell =1														--First Episode in Spell
 AND				LEFT(T2.DiagnosisCode,3) IN ('X60','X61','X62','X63','X64','X66','X67','X68','X69'
 						,'X70','X71','X72','X73','X74','X75','X76','X77','X78','X79'
-						,'X80','X81','X82','X83','X84')                              --Self Harm
+						,'X80','X81','X82','X83','X84')                                  --Self Harm
 
 GROUP BY		T1.EpisodeId
-
 )
-
 
 
 --select * from #BSOL_OF_tbStaging_NumeratorData
@@ -866,6 +978,7 @@ ON			T1.[ReferenceID] = T2.[ReferenceID]
 /*==================================================================================================================================================================
 INSERT FINAL Numerator Date into [EAT_Reporting_BSOL].[OF].[IndicatorData]
 =================================================================================================================================================================*/
+--select top 1000 * from #BSOL_OF_tbStaging_NumeratorData
 
 
 --INSERT INTO		[EAT_Reporting_BSOL].[OF].[IndicatorData] 
