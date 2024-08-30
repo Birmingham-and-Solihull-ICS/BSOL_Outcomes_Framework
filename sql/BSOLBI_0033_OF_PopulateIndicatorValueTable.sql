@@ -94,7 +94,7 @@ into EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
 from #sr
 
 select distinct IndicatorID from  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
-where agg
+
 order by IndicatorID
 
 /**********************************************************************************************************/
@@ -118,12 +118,12 @@ select distinct
 		,cr.DataQualityID
 		,cr.IndicatorStartDate
 		,cr.IndicatorEndDate
-		,cr.IMD,cr.EthnicityCode,cr.Gender
-		,d.IMD, d.Ethnicity
-		,ag.AggregationLabel, ag.AggregationType,ag.AggregationCode
-		,cr.AggregationLabel,cr.AggregationType
-		,cr.AgeGroup,d.AgeGrp
---into #cr
+		--,cr.IMD,cr.EthnicityCode,cr.Gender
+		--,d.IMD, d.Ethnicity
+		--,ag.AggregationLabel, ag.AggregationType,ag.AggregationCode
+		--,cr.AggregationLabel,cr.AggregationType
+		--,cr.AgeGroup,d.AgeGrp
+into #cr
 from  Working.[dbo].[BSOL_0033_OF_Crude_Rates] cr  -- dbo.BSOL_0033_OF_Crude_Rates
 left join EAT_Reporting_BSOL.[OF].[Aggregation] ag on (cr.AggregationLabel=ag.AggregationLabel and cr.AggregationType=ag.AggregationType ) or  (cr.AggregationLabel=ag.AggregationCode and cr.AggregationType=ag.AggregationType )
 left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((cr.IMD=d.IMD) or (cr.IMD is null and d.IMD is null))
@@ -133,7 +133,6 @@ left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((cr.IMD=d.IMD) or (cr.IM
 
 
 --where AggregationID is null
-where AggregationID is null 
 --order by AggregationID
 --select top 10* from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_CrudeRate] --38340
 
@@ -146,8 +145,8 @@ select *
 into EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
 from #cr
 
-select * from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
-where DemographicID is null 
+select distinct IndicatorID from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
+order by IndicatorID
 
 
 select distinct (AgeGrp)  from [EAT_Reporting_BSOL].[OF].[Demographic]
@@ -155,6 +154,55 @@ order by AgeGrp
 
 /**********************************************************************************************************/
 
+
+
+/*********************************************CRUDE RATES Pre-defined denominator*******************************************************/
+-- run this script to organise the columns similar to indicator value table and get the Agg ID and demographic ID
+--for crude rates
+drop table if exists #cr_denom
+select distinct 
+		cr.IndicatorID
+		,cr.InsertDate
+		,cr.Numerator as Numerator
+		,cr.Denominator as Denominator
+		,cr.IndicatorValue
+		,cr.LowerCI95 
+		,cr.UpperCI95
+		,ag.AggregationID
+		,d.DemographicID
+		,cr.DataQualityID
+		,cr.IndicatorStartDate
+		,cr.IndicatorEndDate
+		--,cr.IMD,cr.EthnicityCode,cr.Gender
+		--,d.IMD, d.Ethnicity
+		--,ag.AggregationLabel, ag.AggregationType,ag.AggregationCode
+		--,cr.AggregationLabel,cr.AggregationType
+		--,cr.AgeGroup,d.AgeGrp
+into #cr_denom
+from  Working.[dbo].[BSOL_0033_OF_Crude_Rates_Predefined_Denominators] cr  -- dbo.BSOL_0033_OF_Crude_Rates
+left join EAT_Reporting_BSOL.[OF].[Aggregation] ag on (cr.AggregationLabel=ag.AggregationLabel and cr.AggregationType=ag.AggregationType ) or  (cr.AggregationLabel=ag.AggregationCode and cr.AggregationType=ag.AggregationType )
+left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((cr.IMD=d.IMD) or (cr.IMD is null and d.IMD is null))
+													and ((cr.EthnicityCode=d.Ethnicity) or (cr.EthnicityCode is null and d.Ethnicity is null))
+													and cr.Gender=d.Gender
+													and cr.AgeGroup=d.AgeGrp
+
+
+--where AggregationID is null
+--order by AggregationID
+--select top 10* from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_CrudeRate] --38340
+
+--select * from  Working.[dbo].[BSOL_0033_OF_Crude_Rates]
+--where IMD is null and EthnicityCode is null and Gender is null and AgeGroup is null
+--where AggregationLabel is null
+
+drop table if exists  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
+select * 
+into EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
+from #cr_denom
+
+select distinct IndicatorID
+from  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
+order by IndicatorID
 
 --drop table if exists EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_22401_Falls_CrudeRate]
 --select * 
