@@ -93,8 +93,8 @@ query <- paste0("SELECT * FROM EAT_Reporting_BSOL.[OF].IndicatorData
 # Execute the SQL query
 indicator_data <- dbGetQuery(con, query) %>% 
   as_tibble() %>% 
-  mutate(Ethnicity_Code = trimws(Ethnicity_Code)) %>%  # Remove trailing spaces
-  filter(GP_Practice != 'M88006')
+  mutate(Ethnicity_Code = trimws(Ethnicity_Code))   # Remove trailing spaces
+  
 #4. Data preparation -----------------------------------------------------------
 ##4.1 Function 1: Create aggregated data ---------------------------------------
 
