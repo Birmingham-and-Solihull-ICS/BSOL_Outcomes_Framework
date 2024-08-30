@@ -318,6 +318,7 @@ clean_dataset <- function(data){
   
   data <- data %>% 
     filter(!PCN %in% c("Closed practice", "Not applicable")) %>% 
+    filter(GP_Practice != 'M88006') %>% 
     mutate(AggYear = 1) %>% 
     mutate(Locality_Reg = case_when(
       Indicator_Level == 'Birmingham Local Authority' ~ "Birmingham", 

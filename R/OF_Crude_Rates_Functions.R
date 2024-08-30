@@ -114,8 +114,8 @@ query <- paste0("SELECT *
 # Execute the SQL query
 indicator_data <- dbGetQuery(con, query) %>% 
   as_tibble() %>% 
-  mutate(Ethnicity_Code = trimws(Ethnicity_Code)) # Remove trailing spaces
-
+  mutate(Ethnicity_Code = trimws(Ethnicity_Code)) %>%  # Remove trailing spaces
+  filter(GP_Practice != 'M88006')
 #4. Data preparation -----------------------------------------------------------
 ##4.1 Function 1: Create aggregated data ---------------------------------------
 # Used to aggregate either numerator or denominator data based on the specified year

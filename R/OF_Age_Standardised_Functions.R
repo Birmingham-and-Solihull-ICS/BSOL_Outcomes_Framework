@@ -1,3 +1,18 @@
+
+##########################INSTRUCTIONS##########################################################
+# 1. Go to Step 3: Get numerator data                                                         ##
+# 2. Insert the indicator ID that you wish to extract data from database                      ##  
+# 3. If you want to process one indicator at a time:                                          ## 
+#     - Run the code from the beginning until Step 6.1                                        ## 
+#     - Ensure that you specify the parameters for that indicator                             ## 
+#     - And the indicator_data contains the indicator ID that you wish to process             ## 
+#     - If necessary, filter the indicator_data to include the relevant indicator ID          ## 
+# 4. If you want to process multiple indicators at the same time:                             ## 
+#    - Ensure that you've filled in the parameter_combinations.xlsx file with the indicators  ## 
+#    - Run the code from the beginning until Step 6.2 (skip Step 6.1)                         ## 
+################################################################################################
+    
+
 library(tidyverse)
 library(janitor)
 library(DBI)
@@ -66,32 +81,20 @@ popfile_ward <- read.csv("data/c21_a18_e20_s2_ward.csv", header = TRUE, check.na
 #3. Get numerator data ---------------------------------------------------------
 #3.1 Load the indicator data from the warehouse --------------------------------
 
-# Read the Excel file to get the available indicators
-parameter_combinations <- read_excel("data/parameter_combinations.xlsx", 
-                                     sheet = "standardised_indicators")
+# Insert which indicator IDs to extract
+indicator_ids <- c(59)
 
-# Filter based on indicators requiring age-standardization
-indicators_params <- parameter_combinations %>% 
-  filter(StandardizedIndicator == 'Y' & PredeterminedDenominator == "N") %>%   # The flag used to choose which indicators 
-  filter(IndicatorID %in% c(10, 109, 115))
+# Convert the indicator IDs to a comma-separated string
+indicator_ids_string <- paste(indicator_ids, collapse = ", ")
 
-# Get the unique indicator IDs to be used for importing data from database
-indicator_ids <- unique(indicators_params$IndicatorID)
-
-# Convert the indicator IDs to a comma-separated values
-indicator_ids <- paste(indicator_ids, collapse = ", ") 
-
-# Construct the SQL query with the indicator IDs
-query <- paste0("SELECT *
-                FROM [EAT_Reporting_BSOL].[OF].[IndicatorData]
-                WHERE IndicatorID IN (", indicator_ids, ")")
-
+query <- paste0("SELECT * FROM EAT_Reporting_BSOL.[OF].IndicatorData
+          where IndicatorID IN (", indicator_ids_string, ")")
 
 # Execute the SQL query
 indicator_data <- dbGetQuery(con, query) %>% 
   as_tibble() %>% 
-  mutate(Ethnicity_Code = trimws(Ethnicity_Code)) # Remove trailing spaces
-
+  mutate(Ethnicity_Code = trimws(Ethnicity_Code)) %>%  # Remove trailing spaces
+  filter(GP_Practice != 'M88006')
 #4. Data preparation -----------------------------------------------------------
 ##4.1 Function 1: Create aggregated data ---------------------------------------
 
@@ -602,7 +605,53 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
 
 #6. Process all parameters -----------------------------------------------------
 
-## 6.1 Function 5: Apply functions to specific parameter combinations ----------
+##6.1 Optional: Process one indicator at a time --------------------------------
+# Can use the following codes directly  if you already know which indicator
+# you want to process, and the parameters for that indicator
+
+# Requirements:
+#1. Must use indicator_data, containing the indicator you want to process (see Step 3: Get numerator data)
+#2. Specify the indicator id parameter
+#3. Specify the reference id parameter
+#4. Specify the min age group parameter
+#5. Specify the max age group parameter
+
+## Use 'result' variable to write the data into database (Step 7)
+
+my_numerator <- get_numerator(indicator_data = indicator_data,
+                              indicator_id = 59,
+                              reference_id = 93764,
+                              min_age = NA,
+                              max_age = NA)
+
+my_denominator <- get_denominator(pop_estimates = popfile_ward,
+                                  numerator_data = my_numerator)
+
+result <- calculate_age_std_rate(
+  indicator_id = 59,
+  denominator_data = my_denominator,
+  numerator_data = my_numerator,
+  aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
+  genderGrp = "Persons",
+  ageGrp = "All ages",
+  multiplier = 100000
+)
+
+
+# Use 'result' variable to write the data into the database (Step 7)
+
+##6.2 Process several indicators altogether ------------------------------------
+
+# Read the Excel file to get the available indicators
+parameter_combinations <- readxl::read_excel("data/parameter_combinations.xlsx", 
+                                             sheet = "standardised_indicators")
+
+indicators_params <- parameter_combinations %>% 
+  filter(StandardizedIndicator == 'Y' & PredeterminedDenominator == "N") %>% # Ensure we're taking the correct indicators
+  filter(IndicatorID %in% indicator_ids) # Ensure we're extracting parameters ONLY for indicators we've specified in the beginning, otherwise, error will occur.
+
+
+## Apply functions to specific parameter combinations 
 
 # Parameter:
 # row: the row of parameter combinations data
@@ -685,36 +734,8 @@ results <- indicators_params %>% # Filtered to indicators requiring age-standard
   do(process_parameters(.)) %>%  # Apply the function to each row
   ungroup() #Remove the rowwise grouping, so the output is a simple tibble
 
-## Optional: Only use it to run a small number of indicators and don't want to
-## use Excel file as you already know the indicator parameters
 
-my_numerator <- get_numerator(indicator_data = indicator_data,
-                              indicator_id = 10,
-                              reference_id = 21001,
-                              min_age = NA,
-                              max_age = NA)
-
-my_denominator <- get_denominator(pop_estimates = popfile_ward,
-                                  numerator_data = my_numerator)
-
-result <- calculate_age_std_rate(
-  indicator_id = 10,
-  denominator_data = my_denominator,
-  numerator_data = my_numerator,
-  aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
-  genderGrp = "Persons",
-  ageGrp = "All ages",
-  multiplier = 100000
-)
-
-results %>% 
-  filter(IndicatorID == 115) %>% 
-  View()
-
-
-# Use 'result' variable to write the data into the database
-
-# Write into database ----------------------------------------------------------
+#7. Write into database ----------------------------------------------------------
 
 sql_connection <- dbConnect(
     odbc(),
@@ -728,8 +749,8 @@ sql_connection <- dbConnect(
 dbWriteTable(
   sql_connection,
   Id(schema = "dbo", table = "BSOL_0033_OF_Age_Standardised_Rates"),
-  results,
-  append = TRUE
+  result, # Processed dataset
+  append = TRUE # Append the data to the existing table
   # overwrite = TRUE
   )
 
