@@ -16,10 +16,10 @@ library(tidyverse)
 library(janitor)
 library(DBI)
 library(odbc)
-library(IMD)
 library(PHEindicatormethods)
 library(clipr)
 library(readxl)
+library(lubridate)
 
 rm(list = ls())
 
@@ -40,7 +40,8 @@ con <-
 #2. Get data from database -------------------------------------------------------
 
 # Insert which indicator IDs to extract
-indicator_ids <- c(90, 93)
+indicator_ids <- c(1, 2, 3, 4, 16, 20, 25, 35, 36, 37, 38, 42, 46,
+                   58, 68, 70, 74, 76, 77, 78, 85, 86, 93, 105, 107, 110, 112, 116, 120, 121, 122, 123, 125, 127)
 
 # Convert the indicator IDs to a comma-separated string
 indicator_ids_string <- paste(indicator_ids, collapse = ", ")
@@ -139,9 +140,9 @@ convert_fixed_period <- function(date_range) {
 convert_fixed_period <- Vectorize(convert_fixed_period)
 
 # Example usage
-dates <- c("August 2014-July 2015", "August 2015-July 2016", "August 2016-July 2017")
+dates <- c("April 2022-June 2023",  "August 2013-July 2014", "August 2014-July 2015", "August 2015-July 2016")
 formatted_dates <- sapply(dates, convert_fixed_period)
-print(formatted_dates) # Output: "08/2014-07/2015", "08/2015-07/2016", "08/2016-07/2017"
+print(formatted_dates) 
 
 ##4.3 Function to convert time period in 'To MM YYYY' format to its Fiscal Year -------
 ##E.g., To December 2022 to 2022/2023
@@ -235,79 +236,124 @@ updated_dt <- process_time_periods(dt)
 # Check unique fiscal year for each time period desc
 updated_dt %>% 
   filter(TimePeriodDesc == "Financial Year") %>% 
-  select(TimePeriod, FiscalYear) %>% 
-  distinct()
+  group_by(IndicatorID, TimePeriod, FiscalYear) %>% 
+  select(IndicatorID, TimePeriod, FiscalYear) %>% 
+  distinct() %>% 
+  View()
 
 updated_dt %>% 
   filter(TimePeriodDesc == "Month") %>% 
   select(TimePeriod, FiscalYear) %>% 
-  distinct()
+  distinct() %>% 
+  View()
 
 updated_dt %>% 
   filter(TimePeriodDesc == "Other") %>% 
   select(TimePeriod, FiscalYear) %>% 
-  distinct()
+  distinct() %>% 
+  View()
 
 ##4.6 Function to extract start and end dates separated by "/" -----------------
 # This is used to get the start date and end date from the Fiscal Year in this format:
-# E.g., 01-2021/12-2022 or 08-2022/07-2023
+# E.g., 08/2023-07/2024
 
-extract_start_and_end_date_from_fixed_period <- function(date_string) {
-  # Split the string by "/" to get start and end parts
-  date_parts <- strsplit(date_string, "/")[[1]]
+
+# Custom functions for start and end dates with validation
+get_start_date_from_fixed_period <- function(date_string) {
+  # Remove any spaces and ensure format is consistent
+  date_string <- gsub("\\s+", "", date_string)
   
-  # Extract the start and end dates
-  start_date_string <- date_parts[1]  # "MM-YYYY"
-  end_date_string <- date_parts[2]    # "MM-YYYY"
+  # Split the string by "-"
+  date_parts <- strsplit(date_string, "-")[[1]]
   
-  # Convert to Date objects (assuming the day is the first day of the month)
-  start_date <- as.Date(paste0("01-", start_date_string), format = "%d-%m-%Y")
-  end_date <- as.Date(paste0("31-", end_date_string), format = "%d-%m-%Y")
+  # Ensure date_parts has two components (MM/YYYY)
+  if (length(date_parts) != 2) {
+    return(NA_character_)
+  }
   
-  # Format the dates to DD-MM-YYYY
-  start_date_formatted <- format(start_date, "%d-%m-%Y")
-  end_date_formatted <- format(end_date, "%d-%m-%Y")
+  start_date_string <- date_parts[1]  # Extract the start part ("MM/YYYY")
   
-  # Return a list with the formatted dates
-  return(list(start_date = start_date_formatted, end_date = end_date_formatted))
+  # Convert to a Date object, assuming the first day of the month
+  start_date <- suppressWarnings(dmy(paste0("01-", start_date_string)))  # Suppress warnings for failed parsing
+  
+  return(ifelse(!is.na(start_date), format(start_date, "%d-%m-%Y"), NA_character_))
 }
 
-# Example usage
-date_string <- "08-2012/07-2013"
+get_end_date_from_fixed_period <- function(date_string) {
+  # Remove any spaces and ensure format is consistent
+  date_string <- gsub("\\s+", "", date_string)
+  
+  # Split the string by "-"
+  date_parts <- strsplit(date_string, "-")[[1]]
+  
+  # Ensure date_parts has two components (MM/YYYY)
+  if (length(date_parts) != 2) {
+    return(NA_character_)
+  }
+  
+  end_date_string <- date_parts[2]  # Extract the end part ("MM/YYYY")
+  
+  # Convert to a Date object, assuming the last day of the month
+  end_date <- suppressWarnings(ceiling_date(dmy(paste0("01-", end_date_string)), "month") - days(1))
+  
+  return(ifelse(!is.na(end_date), format(end_date, "%d-%m-%Y"), NA_character_))
+}
 
-extract_start_and_end_date_from_fixed_period(date_string)$start_date # Output: "01-08-2012"
-extract_start_and_end_date_from_fixed_period(date_string)$end_date   # Output: "31-07-2013"
+# Vectorize the custom functions
+get_start_date_from_fixed_period <- Vectorize(get_start_date_from_fixed_period)
+get_end_date_from_fixed_period <- Vectorize(get_end_date_from_fixed_period)
 
-# This is used to extract start date and end date from Fiscal Year in this format
-# E.g., 2023/2024 where the start is 1st April and end is 31st March
 
-extract_start_and_end_date_from_fiscal_year <- function(fiscal_year) {
+# Function for fiscal years (YYYY/YYYY)
+get_start_date_from_fiscal_year <- function(fiscal_year) {
   # Split the fiscal year string by "/"
   years <- strsplit(fiscal_year, "/")[[1]]
   start_year <- years[1]  # Start year (e.g., "2023")
-  end_year <- years[2]    # End year (e.g., "2024")
   
   # Create the start date string for 01-04 (April 1st)
   start_date_string <- paste0("01-04-", start_year)
   
+  # Convert to Date object
+  start_date <- as.Date(start_date_string, format = "%d-%m-%Y")
+  
+  return(ifelse(!is.na(start_date), format(start_date, "%d-%m-%Y"), NA_character_))
+}
+
+get_end_date_from_fiscal_year <- function(fiscal_year) {
+  # Split the fiscal year string by "/"
+  years <- strsplit(fiscal_year, "/")[[1]]
+  end_year <- years[2]  # End year (e.g., "2024")
+  
   # Create the end date string for 31-03 (March 31st)
   end_date_string <- paste0("31-03-", end_year)
   
-  # Convert to Date objects
-  start_date <- as.Date(start_date_string, format = "%d-%m-%Y")
+  # Convert to Date object
   end_date <- as.Date(end_date_string, format = "%d-%m-%Y")
   
-  # Format the dates to DD-MM-YYYY
-  start_date_formatted <- format(start_date, "%d-%m-%Y")
-  end_date_formatted <- format(end_date, "%d-%m-%Y")
-  
-  # Return the formatted start and end dates
-  return(list(start_date = start_date_formatted, end_date = end_date_formatted))
+  return(ifelse(!is.na(end_date), format(end_date, "%d-%m-%Y"), NA_character_))
 }
 
-# Example usage
-extract_start_and_end_date_from_fiscal_year("2023/2024")$start_date # Output: "01-04-2023"
-extract_start_and_end_date_from_fiscal_year("2023/2024")$end_date   # Output: "31-03-2024"
+# Vectorize the custom functions
+get_start_date_from_fiscal_year <- Vectorize(get_start_date_from_fiscal_year)
+get_end_date_from_fiscal_year<- Vectorize(get_end_date_from_fiscal_year)
+
+
+# Apply the functions row-wise using mutate
+# updated_dt_v2 <- updated_dt %>%
+#   mutate(
+#     IndicatorStartDate = case_when(
+#       nchar(FiscalYear) == 15 ~ get_start_date_from_fixed_period(FiscalYear),  # Fixed period (MM/YYYY-MM/YYYY)
+#       nchar(FiscalYear) == 9 ~ get_start_date_from_fiscal_year(FiscalYear),      # Fiscal year (YYYY/YYYY)
+#       TRUE ~ NA_character_  # Return NA for invalid formats
+#     ),
+#     IndicatorEndDate = case_when(
+#       nchar(FiscalYear) == 15 ~ get_end_date_from_fixed_period(FiscalYear),    # Fixed period (MM/YYYY-MM/YYYY)
+#       nchar(FiscalYear) == 9 ~ get_end_date_from_fiscal_year(FiscalYear),        # Fiscal year (YYYY/YYYY)
+#       TRUE ~ NA_character_  # Return NA for invalid formats
+#     )
+#   ) %>%
+#   select(FiscalYear, IndicatorStartDate, IndicatorEndDate) %>%
+#   distinct()
 
 
 #5. Clean datasets ----------------------------------------- -------------------
@@ -317,8 +363,8 @@ extract_start_and_end_date_from_fiscal_year("2023/2024")$end_date   # Output: "3
 clean_dataset <- function(data){
   
   data <- data %>% 
-    filter(!PCN %in% c("Closed practice", "Not applicable")) %>% 
-    filter(GP_Practice != 'M88006') %>% 
+    filter(!(PCN %in% c("Closed practice", "Not applicable"))) %>% 
+    filter(!(GP_Practice %in% c('M88006'))) %>% 
     mutate(AggYear = 1) %>% 
     mutate(Locality_Reg = case_when(
       Indicator_Level == 'Birmingham Local Authority' ~ "Birmingham", 
@@ -424,8 +470,8 @@ create_agg_data_for_fixed_period <- function(data, agg_years = c(1, 3, 5)) {
         mutate(
           StartYear = as.numeric(substr(FiscalYear, 4, 7)),
           EndYear = as.numeric(substr(FiscalYear, 12, 15)),
-          FiscalYear2 = paste0(substr(FiscalYear, 1, 2),"-", StartYear, "/",
-                               substr(FiscalYear, 9, 10), "-", EndYear),
+          FiscalYear2 = paste0(substr(FiscalYear, 1, 2),"/", StartYear, "-",
+                               substr(FiscalYear, 9, 10), "/", EndYear),
           # FiscalYear2 = paste0("08-", StartYear, "/", "07-", EndYear),
           AggYear = 1
         ) %>%
@@ -462,8 +508,8 @@ create_agg_data_for_fixed_period <- function(data, agg_years = c(1, 3, 5)) {
         mutate(
           PeriodEnd = max(EndYear), # Assign the same PeriodEnd for the entire group
           PeriodStart = PeriodEnd - year, # Calculate PeriodStart for rolling years
-          FiscalYear2 = paste0(substr(FiscalYear, 1, 2),"-", PeriodStart, "/",
-                               substr(FiscalYear, 9, 10), "-", PeriodEnd),
+          FiscalYear2 = paste0(substr(FiscalYear, 1, 2),"/", PeriodStart, "-",
+                               substr(FiscalYear, 9, 10), "/", PeriodEnd),
           # FiscalYear2 = paste0("08-", PeriodStart, "/",  "07-", PeriodEnd), # Correctly calculate the FiscalYear2 for the group
           AggYear = year
         ) %>%
@@ -518,9 +564,9 @@ create_agg_data_for_calendar_yr<- function(data, agg_years = c(1, 3, 5)) {
       data_agg <- data %>%
         filter(nchar(FiscalYear) == 4) %>%
         mutate(
-          StartYear = paste0("01-", FiscalYear),
-          EndYear = paste0("12-", FiscalYear),
-          FiscalYear2 = paste0(StartYear, "/", EndYear), 
+          StartYear = paste0("01/", FiscalYear),
+          EndYear = paste0("12/", FiscalYear),
+          FiscalYear2 = paste0(StartYear, "-", EndYear), 
           AggYear = 1
         ) %>%
         group_by(
@@ -548,15 +594,15 @@ create_agg_data_for_calendar_yr<- function(data, agg_years = c(1, 3, 5)) {
         arrange(desc(FiscalYear)) %>% # Order data in descending order of FiscalYear
         mutate(
           Order = row_number(), # Re-create the Order column based on the new order
-          StartYear = paste0("01-", FiscalYear),
-          EndYear = paste0("01-", FiscalYear),
+          StartYear = paste0("01/", FiscalYear),
+          EndYear = paste0("01/", FiscalYear),
           Group = ceiling(Order / year) # Group the data for rolling periods (3 or 5 years)
         ) %>%
         group_by(Group) %>%
         mutate(
           PeriodEnd = max(as.numeric(FiscalYear)), # Assign the same PeriodEnd for the entire group
           PeriodStart = PeriodEnd - (year -1), # Calculate PeriodStart for rolling years
-          FiscalYear2 = paste0("01-", PeriodStart, "/",  "12-", PeriodEnd), # Correctly calculate the FiscalYear2 for the group
+          FiscalYear2 = paste0("01/", PeriodStart, "-",  "12/", PeriodEnd), # Correctly calculate the FiscalYear2 for the group
           AggYear = year
         ) %>%
         ungroup() %>%
@@ -638,7 +684,7 @@ create_aggregate_data <- function(data) {
 # Columns to group the data by, for calculating Only overall crude rates and rates by ethnicity
 
 get_grouping_columns <- function(rate_type, rate_level) {
-  base_group_vars <- c("IndicatorID", "ReferenceID", "FiscalYear")
+  base_group_vars <- c("IndicatorID", "ReferenceID", "FiscalYear", "AggYear")
   
   # Add additional grouping columns based on rate_level
   if (rate_level == "PCN") {
@@ -665,109 +711,112 @@ get_grouping_columns <- function(rate_type, rate_level) {
 }
 
 # Example usage
-get_grouping_columns(rate_type = "overall", rate_level = "Locality") # Output: "IndicatorID"  "ReferenceID"  "FiscalYear"   "Locality_Reg"
+get_grouping_columns(rate_type = "overall", rate_level = "Locality") # Output: "IndicatorID"  "ReferenceID"  "FiscalYear"  "AggYear" "Locality_Reg"
 
 # 8. Function to calculate crude rate ------------------------------------------
 ##8.1 Helper base function to calculate crude rate -----------------------------
 
 calculate_crude_rate <- function(data, group_vars, aggYear = c(1, 3, 5), rate_level, rate_type, ageGrp, genderGrp, multiplier = 100000) {
+  
+  all_results <- list()  # Initialize a list to store results for each year
+  
+  for (year in aggYear) {
+    # Filter data for the specified aggregation year
+    filtered_data <- data %>% filter(AggYear == year)
     
-    all_results <- list()  # Initialize a list to store results for each year
-    
-    for (year in aggYear) {
-      # Filter data for the specified aggregation year
-      filtered_data <- data %>% filter(AggYear == year)
-      
-      # Perform the join and grouping based on the type
-      grouped_data <- if (rate_type == "ethnicity") {
-        filtered_data %>%
-          left_join(ethnicity_map, by = c("Ethnicity_Code" = "NHSCode")) %>%
-          group_by(across(all_of(group_vars)))
-      } else {
-        filtered_data %>%
-          group_by(across(all_of(group_vars)))
-      }
-      
-      # Summarize data
-      result <- grouped_data %>%
-        summarise(Numerator = sum(Numerator, na.rm = TRUE),
-                  Denominator = sum(Denominator, na.rm = TRUE),
-                  .groups = 'drop') %>%
-        mutate(
-          OriginalSign = sign(Numerator),  # Capture the original sign of Numerator
-          Numerator = abs(Numerator) # Get the absolute number to handle negative numerators (such as Excess Winter death index)
-        ) %>% 
-        mutate(
-          Numerator = ifelse(is.na(Numerator) | Denominator == 0, 0, Numerator),
-          Denominator = ifelse(Denominator == 0, 1, Denominator)  # Prevent division by zero
-        ) %>%
-        phe_rate(Numerator, Denominator, type = "standard", multiplier = multiplier) %>%
-        rename(
-          IndicatorValue = value,
-          LowerCI95 = lowercl,
-          UpperCI95 = uppercl
-        ) %>%
-        mutate(
-          Numerator = Numerator * OriginalSign, # Reapply the original sign to the numerator
-          IndicatorValue = IndicatorValue * OriginalSign  # Reapply the original sign to the calculated rate
-        ) %>% 
-        # Use if...else statements to handle different rate levels
-        mutate(
-          InsertDate = today(),
-          AggYear = year,
-          DataQualityID = 1,
-          StatusID = 1,
-          AggregationLabel = if (rate_level == "PCN") {
-            PCN
-          } else if (rate_level == "Local Authority" || rate_level == "Locality") {
-            Locality_Reg
-          } else if (rate_level == "ICB") {
-            "BSOL ICB"
-          } else {
-            NA_character_
-          },
-          AggregationType = if (rate_level == "PCN") {
-            "PCN"
-          } else if (rate_level == "Locality") {
-            "Locality (Registered)"
-          } else if (rate_level == "Local Authority") {
-            "Local Authority"
-          } else if (rate_level == "ICB") {
-            "ICB"
-          } else {
-            NA_character_
-          },
-          Gender = genderGrp,
-          AgeGroup = ageGrp,
-          IMD = NA_character_,
-          EthnicityCode = if (rate_type == "ethnicity") ONSGroup else NA_character_,  # Directly assign ONSGroup
-          IndicatorStartDate = case_when(
-            nchar(FiscalYear) == 15 ~ extract_start_and_end_date_from_fixed_period(FiscalYear)$start_date,
-            nchar(FiscalYear) == 9 ~ extract_start_and_end_date_from_fiscal_year(FiscalYear)$start_date,
-            TRUE ~ NA
-          ),
-          IndicatorEndDate = case_when(
-            nchar(FiscalYear) == 15 ~ extract_start_and_end_date_from_fixed_period(FiscalYear)$end_date,
-            nchar(FiscalYear) == 9 ~ extract_start_and_end_date_from_fiscal_year(FiscalYear)$end_date,
-            TRUE ~ NA
-          ),
-          IndicatorValueType = case_when(
-            rate_type == "ethnicity" ~ paste0(year, "-year Ethnicity Crude Rate"),
-            rate_type == "overall" ~ paste0(year, "-year Overall Crude Rate")
-          )) %>%
-        select(IndicatorID, InsertDate, Numerator, Denominator, IndicatorValue, IndicatorValueType,
-               LowerCI95, UpperCI95, AggregationType, AggregationLabel, FiscalYear, Gender, AgeGroup, IMD, EthnicityCode,
-               StatusID, DataQualityID, IndicatorStartDate, IndicatorEndDate)
-      
-      # Store result in list
-      all_results[[paste0(year, "YR_data")]] <- result
+    # Perform the join and grouping based on the type
+    grouped_data <- if (rate_type == "ethnicity") {
+      filtered_data %>%
+        left_join(ethnicity_map, by = c("Ethnicity_Code" = "NHSCode")) %>%
+        group_by(across(all_of(group_vars)))
+    } else {
+      filtered_data %>%
+        group_by(across(all_of(group_vars)))
     }
     
-    # Combine results for all years
-    output <- bind_rows(all_results)
+    # Summarize data
+    result <- grouped_data %>%
+      summarise(Numerator = sum(Numerator, na.rm = TRUE),
+                Denominator = sum(Denominator, na.rm = TRUE),
+                .groups = 'drop') %>%
+      mutate(
+        OriginalSign = sign(Numerator),  # Capture the original sign of Numerator
+        Numerator = abs(Numerator)       # Get the absolute number to handle negative numerators (such as Excess Winter death index)
+      ) %>%
+      mutate(
+        Numerator = ifelse(is.na(Numerator) | Denominator == 0, 0, Numerator),
+        Denominator = ifelse(Denominator == 0, 1, Denominator)  # Prevent division by zero
+      ) %>%
+      phe_rate(Numerator, Denominator, type = "standard", multiplier = multiplier) %>%
+      rename(
+        IndicatorValue = value,
+        LowerCI95 = lowercl,
+        UpperCI95 = uppercl
+      ) %>%
+      mutate(
+        Numerator = Numerator * OriginalSign,  # Reapply the original sign to the numerator
+        IndicatorValue = IndicatorValue * OriginalSign  # Reapply the original sign to the calculated rate
+      ) %>%
+      # Use if_else to handle different rate levels and conditions
+      mutate(
+        InsertDate = today(),
+        AggYear = year,
+        DataQualityID = 1,
+        StatusID = 1,
+        AggregationLabel = if (rate_level == "PCN") {
+          PCN
+        } else if (rate_level == "Local Authority" || rate_level == "Locality") {
+          Locality_Reg
+        } else if (rate_level == "ICB") {
+          "BSOL ICB"
+        } else {
+          NA_character_
+        },
+        AggregationType = if (rate_level == "PCN") {
+          "PCN"
+        } else if (rate_level == "Locality") {
+          "Locality (Registered)"
+        } else if (rate_level == "Local Authority") {
+          "Local Authority"
+        } else if (rate_level == "ICB") {
+          "ICB"
+        } else {
+          NA_character_
+        },
+        Gender = genderGrp,
+        AgeGroup = ageGrp,
+        IMD = NA_character_,
+        EthnicityCode = if (rate_type == "ethnicity") ONSGroup else NA_character_) %>%   # Directly assign ONSGroup
+      ungroup() %>% 
+      mutate(
+        IndicatorStartDate = case_when(
+          nchar(FiscalYear) == 15 ~ get_start_date_from_fixed_period(FiscalYear),
+          nchar(FiscalYear) == 9 ~ get_start_date_from_fiscal_year(FiscalYear),
+          TRUE ~ NA_character_
+        ),
+        IndicatorEndDate = case_when(
+          nchar(FiscalYear) == 15 ~ get_end_date_from_fixed_period(FiscalYear),
+          nchar(FiscalYear) == 9 ~ get_end_date_from_fiscal_year(FiscalYear),
+          TRUE ~ NA_character_
+        ),
+        IndicatorValueType = case_when(
+          rate_type == "ethnicity" ~ paste0(year, "-year Ethnicity Crude Rate"),
+          rate_type == "overall" ~ paste0(year, "-year Overall Crude Rate")
+        )
+      ) %>%
+      select(IndicatorID, InsertDate, Numerator, Denominator, IndicatorValue, IndicatorValueType,
+             LowerCI95, UpperCI95, AggregationType, AggregationLabel, FiscalYear, Gender, AgeGroup, IMD, EthnicityCode,
+             StatusID, DataQualityID, IndicatorStartDate, IndicatorEndDate, AggYear)
     
-    return(output)
+    # Store result in list
+    all_results[[paste0(year, "YR_data")]] <- result
   }
+  
+  # Combine results for all years
+  output <- bind_rows(all_results)
+  
+  return(output)
+}
 
 #8.2 Final function to calculate crude rate depending on the rate level ---------
 process_dataset <- function(clean_data, ageGrp, genderGrp, multiplier = 100000) {
@@ -855,10 +904,10 @@ process_dataset <- function(clean_data, ageGrp, genderGrp, multiplier = 100000) 
 
 # Example usage
 # Ensure you've extracted this indicator data from the database first
-# process_dataset(clean_data = clean_dt %>% 
-#                                   filter(IndicatorID == 1), 
-#                                 ageGrp = "35+ yrs", 
-#                                 genderGrp = "Persons") 
+# processed_dt <- process_dataset(clean_data = clean_dt %>%
+#                                   filter(IndicatorID == 103),
+#                                 ageGrp = "35+ yrs",
+#                                 genderGrp = "Persons")
 
 
 
@@ -873,9 +922,9 @@ process_dataset <- function(clean_data, ageGrp, genderGrp, multiplier = 100000) 
 #3. Specify the gender group parameter
 #4. Use the 'processed_dataset' variable to write the data into database (Step 10)
 
-processed_dataset <- process_dataset(clean_data = clean_dt %>% filter(IndicatorID == 90),
-                                     ageGrp = "All ages",
-                                     genderGrp = "Persons")
+# processed_dataset <- process_dataset(clean_data = clean_dt %>% filter(IndicatorID == 90),
+#                                      ageGrp = "All ages",
+#                                      genderGrp = "Persons")
 
 ##9.2 Process multiple indicators at the same time -----------------------------
 
@@ -930,6 +979,10 @@ results <- indicator_params %>%
   rowwise() %>%
   do(process_parameters(.)) %>%
   ungroup() # Remove the rowwise grouping, so the output is a simple tibble
+
+# Remove the 3- and 5-rolling years data from the final output
+results <- results %>% 
+  filter(AggYear == 1)
 
 
 #10. Write into database ----------------------------------------------------------
