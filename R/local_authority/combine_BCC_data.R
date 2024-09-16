@@ -151,6 +151,32 @@ if (length(missing_definition) > 0) {
   )
 }
 
+# Find any outliers
+outlier_checks <- OF_values %>%
+  group_by(IndicatorID) %>%
+  summarise(
+    median = mean(IndicatorValue),
+    iqr = IQR(IndicatorValue),
+    Q3 = quantile(IndicatorValue, 0.75),
+    Q1 = quantile(IndicatorValue, 0.25),
+    nvals = n(),
+    min = min(IndicatorValue),
+    max = max(IndicatorValue),
+    outliers = sum(
+      IndicatorValue < Q1 - 1.5*iqr |
+        IndicatorValue > Q3 + 1.5*iqr   
+    )
+  ) %>%
+  select(
+    -c(Q1, Q3)
+  ) %>%
+  filter(
+    outliers > 0
+  )
+
+cat("\nPotential outlier check:\n")
+print(outlier_checks)
+
 #################################################################
 ###                      Save Data                            ###
 #################################################################
@@ -176,3 +202,4 @@ write_csv(OF_meta,
           meta_save_name)
 
 
+print("Done.")
