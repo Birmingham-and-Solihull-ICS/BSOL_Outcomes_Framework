@@ -547,7 +547,7 @@ output_meta <- collected_meta %>%
       TRUE ~ `Definition of numerator`
     ),
     `Rate Type` = case_when(
-      IndicatorID %in% c(118,119) ~ "Rate per 1,000",
+      IndicatorID %in% c(118,119) ~ "Crute rate per 1,000",
       TRUE ~ `Rate Type`
     )
   ) %>%
