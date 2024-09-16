@@ -23,10 +23,11 @@ fetch_meta <- function(FingerTips_id) {
     IndicatorID = FingerTips_id
   ) %>%
     mutate(
-      `Source of numerator` = `Source of numerator...10`,
-      `Source of denominator`  = `Source of denominator...12`,
+      `Source of numerator` = `Source of numerator`,
+      `Source of denominator`  = `Source of denominator`,
       `External Reference` = Links,
       `Rate Type` = case_when(
+        `Unit` == "%" ~ "Percentage",
         `Value type` == "Proportion" ~ `Value type`,
         grepl("rate", tolower(`Value type`)) ~ paste(`Value type`, "per", Unit)
         ),
@@ -77,7 +78,7 @@ get_CI_method <- function(meta) {
   Value_type = meta %>% pull("Rate Type")
   if (grepl("rate", tolower(Value_type))) {
     return("Byar's Method")
-  } else if (grepl("proportion", tolower(Value_type))){
+  } else if (grepl("proportion|percentage", tolower(Value_type))){
     return("Wilson's Method")
   } else {
     stop(sprintf("Unexpected Value Type: %s",Value_type))
