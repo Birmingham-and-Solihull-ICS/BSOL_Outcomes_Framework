@@ -40,8 +40,7 @@ con <-
 #2. Get data from database -------------------------------------------------------
 
 # Insert which indicator IDs to extract
-indicator_ids <- c(1, 2, 3, 4, 16, 20, 25, 35, 36, 37, 38, 42, 46,
-                   58, 68, 70, 74, 76, 77, 78, 85, 86, 93, 105, 107, 110, 112, 116, 120, 121, 122, 123, 125, 127)
+indicator_ids <- c(103, 113)
 
 # Convert the indicator IDs to a comma-separated string
 indicator_ids_string <- paste(indicator_ids, collapse = ", ")
@@ -274,7 +273,7 @@ get_start_date_from_fixed_period <- function(date_string) {
   start_date_string <- date_parts[1]  # Extract the start part ("MM/YYYY")
   
   # Convert to a Date object, assuming the first day of the month
-  start_date <- suppressWarnings(dmy(paste0("01-", start_date_string)))  # Suppress warnings for failed parsing
+  start_date <- suppressWarnings(dmy(paste0("01/", start_date_string)))  # Suppress warnings for failed parsing
   
   return(ifelse(!is.na(start_date), format(start_date, "%d-%m-%Y"), NA_character_))
 }
@@ -294,7 +293,7 @@ get_end_date_from_fixed_period <- function(date_string) {
   end_date_string <- date_parts[2]  # Extract the end part ("MM/YYYY")
   
   # Convert to a Date object, assuming the last day of the month
-  end_date <- suppressWarnings(ceiling_date(dmy(paste0("01-", end_date_string)), "month") - days(1))
+  end_date <- suppressWarnings(ceiling_date(dmy(paste0("01/", end_date_string)), "month") - days(1))
   
   return(ifelse(!is.na(end_date), format(end_date, "%d-%m-%Y"), NA_character_))
 }
@@ -337,18 +336,43 @@ get_end_date_from_fiscal_year <- function(fiscal_year) {
 get_start_date_from_fiscal_year <- Vectorize(get_start_date_from_fiscal_year)
 get_end_date_from_fiscal_year<- Vectorize(get_end_date_from_fiscal_year)
 
+# Function for calendar years (YYYY)
+get_start_date_from_calendar_year <- function(calendar_year) {
+  
+  # Construct start date
+  start_date <- as.Date(paste0("01-01-", calendar_year), format = "%d-%m-%Y")
+  
+  # Return formatted string in DD-MM-YYYY format
+  return(ifelse(!is.na(start_date), format(start_date, "%d-%m-%Y"), NA_character_))
+}
+
+get_end_date_from_calendar_year <- function(calendar_year) {
+  
+  # Construct end date
+  end_date <- as.Date(paste0("31-12-", calendar_year), format = "%d-%m-%Y")
+  
+  # Return formatted string in DD-MM-YYYY format
+  return(ifelse(!is.na(end_date), format(end_date, "%d-%m-%Y"), NA_character_))
+}
+
+# Vectorize the custom functions
+get_start_date_from_calendar_year <- Vectorize(get_start_date_from_calendar_year)
+get_end_date_from_calendar_year<- Vectorize(get_end_date_from_calendar_year)
+
 
 # Apply the functions row-wise using mutate
 # updated_dt_v2 <- updated_dt %>%
 #   mutate(
 #     IndicatorStartDate = case_when(
 #       nchar(FiscalYear) == 15 ~ get_start_date_from_fixed_period(FiscalYear),  # Fixed period (MM/YYYY-MM/YYYY)
-#       nchar(FiscalYear) == 9 ~ get_start_date_from_fiscal_year(FiscalYear),      # Fiscal year (YYYY/YYYY)
+#       nchar(FiscalYear) == 9 ~ get_start_date_from_fiscal_year(FiscalYear),    # Fiscal year (YYYY/YYYY) 
+#       nchar(FiscalYear) == 4 ~ get_start_date_from_calendar_year(FiscalYear),  # Calendar year (YYYY)
 #       TRUE ~ NA_character_  # Return NA for invalid formats
 #     ),
 #     IndicatorEndDate = case_when(
 #       nchar(FiscalYear) == 15 ~ get_end_date_from_fixed_period(FiscalYear),    # Fixed period (MM/YYYY-MM/YYYY)
-#       nchar(FiscalYear) == 9 ~ get_end_date_from_fiscal_year(FiscalYear),        # Fiscal year (YYYY/YYYY)
+#       nchar(FiscalYear) == 9 ~ get_end_date_from_fiscal_year(FiscalYear),      # Fiscal year (YYYY/YYYY)
+#       nchar(FiscalYear) == 4 ~ get_end_date_from_calendar_year(FiscalYear),    # Calendar year (YYYY)
 #       TRUE ~ NA_character_  # Return NA for invalid formats
 #     )
 #   ) %>%
@@ -983,6 +1007,10 @@ results <- indicator_params %>%
 # Remove the 3- and 5-rolling years data from the final output
 results <- results %>% 
   filter(AggYear == 1)
+
+# Remove AggYear column from the final output
+results <- results %>% 
+  select(-AggYear)
 
 
 #10. Write into database ----------------------------------------------------------
