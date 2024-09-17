@@ -91,13 +91,13 @@ check_time_point_combinations <- function(original_data, processed_data) {
       IndicatorStartDate = case_when(
         nchar(FiscalYear) == 15 ~ get_start_date_from_fixed_period(FiscalYear),  # Fixed period (MM/YYYY-MM/YYYY)
         nchar(FiscalYear) == 9 ~ get_start_date_from_fiscal_year(FiscalYear),    # Fiscal year (YYYY/YYYY)
-        nchar(FiscalYear) == 4 ~ paste0("01-01-", FiscalYear),                   # Calendar year (YYYY)
+        nchar(FiscalYear) == 4 ~ get_start_date_from_calendar_year(FiscalYear),                   # Calendar year (YYYY)
         TRUE ~ NA_character_  # Return NA for invalid formats
       ),
       IndicatorEndDate = case_when(
         nchar(FiscalYear) == 15 ~ get_end_date_from_fixed_period(FiscalYear),    # Fixed period (MM/YYYY-MM/YYYY)
         nchar(FiscalYear) == 9 ~ get_end_date_from_fiscal_year(FiscalYear),      # Fiscal year (YYYY/YYYY)
-        nchar(FiscalYear) == 4 ~ paste0("31-12-", FiscalYear),                   # Calendar year (YYYY)
+        nchar(FiscalYear) == 4 ~ get_end_date_from_calendar_year(FiscalYear),                   # Calendar year (YYYY)
         TRUE ~ NA_character_  # Return NA for invalid formats
       )
     ) %>%
@@ -130,5 +130,6 @@ check_time_point_combinations <- function(original_data, processed_data) {
 
 # Example
 check_time_point_combinations(original_data = updated_dt, processed_data = results)
+
 
 
