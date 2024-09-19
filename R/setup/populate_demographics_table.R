@@ -362,6 +362,30 @@ demo_table <-
   bind_rows(append_517)
 
 
+
+###############################################################################
+# New values added for Indicator for < 1yr, Ethnicity, no deprivation
+
+
+persons_lt1 <- data.frame (
+  AgeGrp = c("<1 yr (including <28 days)", "<28 days")
+)
+
+append_lt1 <-
+  persons_lt1  %>% cross_join(ethnic_codes) %>%
+  mutate(DemographicLabel = paste0('Persons: ', AgeGrp,': ',ONSGroup) ,
+         Gender = 'Persons',
+         AgeGrp = AgeGrp,
+         IMD = NA,
+         Ethnicity = ONSGroup
+  ) %>%
+  select(DemographicLabel, Gender, AgeGrp, Ethnicity, IMD)
+
+# add into main table
+demo_table <- 
+  demo_table %>% 
+  bind_rows(append_lt1)
+
 ###############################################################################
 # Write output
 library(DBI)
