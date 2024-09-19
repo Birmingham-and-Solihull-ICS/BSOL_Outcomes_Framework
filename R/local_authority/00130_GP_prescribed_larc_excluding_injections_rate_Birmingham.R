@@ -229,15 +229,16 @@ output_df <- rbind(
     IndicatorID = IndicatorID,
     Year_Start = stringr::str_extract(quarter,"\\d{2}"),
     quarter_number = as.numeric(stringr::str_extract(quarter,"\\d{1}")),
-    IndicatorStartDate = as.Date(sprintf("%s/04/01", Year_Start)) %m+% 
+    IndicatorStartDate = as.Date(sprintf("%s/04/01", Year_Start), format="%y/%m/%d") %m+% 
       months(3 * (quarter_number - 1)),
-    IndicatorEndDate = as.Date(sprintf("%s/06/30", Year_Start)) %m+% 
+    IndicatorEndDate = as.Date(sprintf("%s/06/30", Year_Start), format="%y/%m/%d") %m+% 
       months(3 * (quarter_number - 1)),
     # Calculate 95% Wilson confidence interval
     Z = qnorm(0.975),
     p_hat = IndicatorValue / 1000,
-    LowerCI95 = 1000 * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-    UpperCI95 = 1000 * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator)
+    a_prime = Numerator + 0.5,
+    LowerCI95 = 1000 * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator,
+    UpperCI95 = 1000 * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
   ) %>%
   select(
     c("ValueID", "IndicatorID", "InsertDate", 
@@ -249,4 +250,4 @@ output_df <- rbind(
   
 
 # Save output
-write.csv(output_df, "../../data/output/birmingham-source/0023_total_prescribed_larc_excluding_injections_rate.csv")
+write.csv(output_df, "../../data/output/birmingham-source/data/0130_GP_prescribed_larc_excluding_injections_rate.csv")
