@@ -100,7 +100,7 @@ popfile_ward <- read.csv("data/C21_a86_e20_ward.csv", header = TRUE, check.names
 # indicator_ids <- paste(indicator_ids, collapse = ", ")
 
 # Insert which indicator IDs to extract
-indicator_ids <- c(87, 88)
+indicator_ids <- c(14, 18, 31, 32, 48, 87, 88, 108, 117)
 
 # Convert the indicator IDs to a comma-separated string
 indicator_ids_string <- paste(indicator_ids, collapse = ", ")
@@ -136,7 +136,7 @@ create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator"
         mutate(
           FiscalYearStart = as.numeric(substr(FiscalYear, 1, 4)),
           PeriodStart = (FiscalYearStart %/% year) * year,
-          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 2),
+          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 3),
           AggYear = year
         ) 
     }
@@ -315,7 +315,7 @@ get_denominator <- function(min_age = NA, max_age = NA, pop_estimates, numerator
 # Example
 # my_denominator <- get_denominator(min_age = NA,
 #                                     max_age = 74,
-#                                     pop_estimates = popfile_ward, 
+#                                     pop_estimates = popfile_ward,
 #                                     numerator_data = my_numerator)
 
 #5. Crude Rates Calculation ----------------------------------------------------
@@ -597,25 +597,25 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
 
 ## Use 'result' variable to write the data into database (Step 7)
 
-my_numerator <- get_numerator(indicator_data = indicator_data,
-                                   indicator_id = 87,
-                                   min_age = NA,
-                                   max_age = 74)
-
-my_denominator <- get_denominator(min_age = NA,
-                                    max_age = 74,
-                                    pop_estimates = popfile_ward,
-                                    numerator_data = my_numerator)
-
-result <- calculate_crude_rate(
-  indicator_id = 87,
-  denominator_data = my_denominator,
-  numerator_data = my_numerator,
-  aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
-  genderGrp = "Persons",
-  ageGrp = "<75 yrs",
-  multiplier = 100000
-)
+# my_numerator <- get_numerator(indicator_data = indicator_data,
+#                                    indicator_id = 115,
+#                                    min_age = NA,
+#                                    max_age = 74)
+# 
+# my_denominator <- get_denominator(min_age = NA,
+#                                     max_age = 74,
+#                                     pop_estimates = popfile_ward,
+#                                     numerator_data = my_numerator)
+# 
+# result <- calculate_crude_rate(
+#   indicator_id = 87,
+#   denominator_data = my_denominator,
+#   numerator_data = my_numerator,
+#   aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
+#   genderGrp = "Persons",
+#   ageGrp = "<75 yrs",
+#   multiplier = 100000
+# )
 
 
 ## 6.2 Process several indicators altogether -----------------------------
@@ -716,6 +716,9 @@ results <- indicators_params %>%
   do(process_parameters(.)) %>%  # Apply the function to each row
   ungroup() #Remove the rowwise grouping, so the output is a simple tibble
 
+# Remove the '2024/2025' Fiscal Year from the final output
+results <- results %>% 
+  filter(FiscalYear != '2024/2025')
 
 # Write into database ----------------------------------------------------------
 
@@ -733,8 +736,8 @@ dbWriteTable(
   sql_connection,
   Id(schema = "dbo", table = "BSOL_0033_OF_Crude_Rates"),
   results, # Processed dataset
-  append = TRUE # Append data to the existing table
-  # overwrite = TRUE
+  # append = TRUE # Append data to the existing table
+  overwrite = TRUE
 )
 
 # End the timer

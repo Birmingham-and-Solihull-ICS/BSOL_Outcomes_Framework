@@ -21,12 +21,14 @@ library(clipr)
 library(readxl)
 library(lubridate)
 
+
 rm(list = ls())
 
 # Start the timer
 start_time <- Sys.time()
 
 #1. DB Connection --------------------------------------------------------------
+
 
 con <-
   dbConnect(
@@ -40,7 +42,8 @@ con <-
 #2. Get data from database -------------------------------------------------------
 
 # Insert which indicator IDs to extract
-indicator_ids <- c(103, 113)
+indicator_ids <- c(1, 2, 3, 4, 16, 20, 25, 35, 36, 37, 38, 42, 46, 58, 68, 70, 74, 76, 77,
+                   78, 85, 86, 90, 93, 103, 105, 107, 110, 112, 113, 116, 120, 121, 122, 123, 125, 127)
 
 # Convert the indicator IDs to a comma-separated string
 indicator_ids_string <- paste(indicator_ids, collapse = ", ")
@@ -49,6 +52,7 @@ query <- paste0("SELECT * FROM EAT_Reporting_BSOL.[OF].IndicatorDataPredefinedDe
           where IndicatorID IN (", indicator_ids_string, ")")
 
 data <- dbGetQuery(con, query)
+
 
 #3. Ethnicity mapping ------------------------------------------------------------
 
@@ -779,7 +783,9 @@ calculate_crude_rate <- function(data, group_vars, aggYear = c(1, 3, 5), rate_le
       ) %>%
       mutate(
         Numerator = Numerator * OriginalSign,  # Reapply the original sign to the numerator
-        IndicatorValue = IndicatorValue * OriginalSign  # Reapply the original sign to the calculated rate
+        IndicatorValue = IndicatorValue * OriginalSign,  # Reapply the original sign to the calculated rate
+        LowerCI95 = LowerCI95 * OriginalSign,  # Reapply the original sign to the lower CI
+        UpperCI95 = UpperCI95 * OriginalSign   # Reapply the original sign to the upper CI
       ) %>%
       # Use if_else to handle different rate levels and conditions
       mutate(
@@ -946,7 +952,7 @@ process_dataset <- function(clean_data, ageGrp, genderGrp, multiplier = 100000) 
 #3. Specify the gender group parameter
 #4. Use the 'processed_dataset' variable to write the data into database (Step 10)
 
-# processed_dataset <- process_dataset(clean_data = clean_dt %>% filter(IndicatorID == 90),
+# processed_dataset <- process_dataset(clean_data = clean_dt %>% filter(IndicatorID == 16),
 #                                      ageGrp = "All ages",
 #                                      genderGrp = "Persons")
 
@@ -1006,7 +1012,8 @@ results <- indicator_params %>%
 
 # Remove the 3- and 5-rolling years data from the final output
 results <- results %>% 
-  filter(AggYear == 1)
+  filter(AggYear == 1) %>% 
+  filter(FiscalYear != '2024/2025')
 
 # Remove AggYear column from the final output
 results <- results %>% 
@@ -1031,10 +1038,10 @@ sql_connection <-
 
 dbWriteTable(
   sql_connection,
-  Id(schema = "dbo", table = "BSOL_0033_OF_Crude_Rates_Predefined_Denominators_v2"),
+  Id(schema = "dbo", table = "BSOL_0033_OF_Crude_Rates_Predefined_Denominators"),
   results,
-  append = TRUE
-  # overwrite = TRUE
+  # append = TRUE
+  overwrite = TRUE
 )
 
 # End the timer

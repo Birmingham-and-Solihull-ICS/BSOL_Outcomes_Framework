@@ -82,7 +82,7 @@ popfile_ward <- read.csv("data/c21_a18_e20_s2_ward.csv", header = TRUE, check.na
 #3.1 Load the indicator data from the warehouse --------------------------------
 
 # Insert which indicator IDs to extract
-indicator_ids <- c(59)
+indicator_ids <- c(10, 11, 13, 19, 24, 26, 49, 50, 51, 59, 104, 109, 114, 115, 124, 129)
 
 # Convert the indicator IDs to a comma-separated string
 indicator_ids_string <- paste(indicator_ids, collapse = ", ")
@@ -113,7 +113,7 @@ create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator"
         mutate(
           FiscalYearStart = as.numeric(substr(FiscalYear, 1, 4)),
           PeriodStart = (FiscalYearStart %/% year) * year,
-          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 2),
+          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 3),
           AggYear = year
         ) 
     }
@@ -153,6 +153,7 @@ create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator"
 
   return(output)
 }
+
 
 ##4.2 Function 2: Create numerator dataset -------------------------------------
 
@@ -265,7 +266,7 @@ get_denominator <- function(pop_estimates, numerator_data){
   # Map the population estimates to the unique Wards and LADs
   pop_estimates <- pop_estimates %>% 
     # Ensures the denominator data contains the age-specific bands for the indicator 
-    filter(age_b_18_categories_code %in% unique(my_numerator$AgeBandCode)) %>% 
+    filter(age_b_18_categories_code %in% unique(numerator_data$AgeBandCode)) %>% 
     inner_join(Ward_LAD_unique, 
                by = c("electoral_wards_and_divisions_code" = "WD22CD")) %>% 
     group_by(electoral_wards_and_divisions_code, electoral_wards_and_divisions,
@@ -603,6 +604,7 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
 # )
 
 
+
 #6. Process all parameters -----------------------------------------------------
 
 ##6.1 Optional: Process one indicator at a time --------------------------------
@@ -618,24 +620,24 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
 
 ## Use 'result' variable to write the data into database (Step 7)
 
-my_numerator <- get_numerator(indicator_data = indicator_data,
-                              indicator_id = 59,
-                              reference_id = 93764,
-                              min_age = NA,
-                              max_age = NA)
-
-my_denominator <- get_denominator(pop_estimates = popfile_ward,
-                                  numerator_data = my_numerator)
-
-result <- calculate_age_std_rate(
-  indicator_id = 59,
-  denominator_data = my_denominator,
-  numerator_data = my_numerator,
-  aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
-  genderGrp = "Persons",
-  ageGrp = "All ages",
-  multiplier = 100000
-)
+# my_numerator <- get_numerator(indicator_data = indicator_data,
+#                               indicator_id = 109,
+#                               reference_id = 90808,
+#                               min_age = 15,
+#                               max_age = 24)
+# 
+# my_denominator <- get_denominator(pop_estimates = popfile_ward,
+#                                   numerator_data = my_numerator)
+# 
+# result <- calculate_age_std_rate(
+#   indicator_id = 109,
+#   denominator_data = my_denominator,
+#   numerator_data = my_numerator,
+#   aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
+#   genderGrp = "Persons",
+#   ageGrp = "15-24 yrs",
+#   multiplier = 100000
+# )
 
 
 # Use 'result' variable to write the data into the database (Step 7)
@@ -734,6 +736,9 @@ results <- indicators_params %>% # Filtered to indicators requiring age-standard
   do(process_parameters(.)) %>%  # Apply the function to each row
   ungroup() #Remove the rowwise grouping, so the output is a simple tibble
 
+# Remove the '2024/2025' Fiscal Year from the final output
+results <- results %>% 
+  filter(FiscalYear != '2024/2025')
 
 #7. Write into database ----------------------------------------------------------
 
@@ -749,9 +754,9 @@ sql_connection <- dbConnect(
 dbWriteTable(
   sql_connection,
   Id(schema = "dbo", table = "BSOL_0033_OF_Age_Standardised_Rates"),
-  result, # Processed dataset
-  append = TRUE # Append the data to the existing table
-  # overwrite = TRUE
+  results, # Processed dataset
+  # append = TRUE # Append the data to the existing table
+  overwrite = TRUE
   )
 
 # End the timer
