@@ -12,6 +12,11 @@ ids <- read_excel(
 GP_lookup <- read.csv("../../data/better-GP-lookup-march-2024.csv") %>%
   select(-c(Type, PCN, Locality, LA))
 
+PCN_lookup <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "PCN-Locality-Lookup"
+)
+
 #################################################################
 ##                        Functions                            ##
 #################################################################
@@ -85,6 +90,18 @@ get_CI_method <- function(meta) {
   }
 }
 
+select_final_cols <- function(df) {
+  df <- df %>%
+    select(
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
+      LowerCI95, UpperCI95, magnitude, CI_method
+    ) %>% 
+    select(
+      -c(magnitude, CI_method)
+      )
+  return (df)
+}
+
 process_LA_data <- function(FingerTips_id) {
   
   data_and_meta <- fetch_data(FingerTips_id, AreaTypeID = 502)
@@ -114,46 +131,47 @@ process_LA_data <- function(FingerTips_id) {
   
   # Filter for Birmingham and Solihull
   df_LA <- data %>%
-    filter(AreaCode %in% c("E08000029", "E08000025"))
+    filter(
+      AreaCode %in% c("E08000029", "E08000025")
+      ) 
   
-  # Filter for Birmingham and Solihull
   df_ICB <- df_LA %>%
-    group_by(Timeperiod,  Sex, Age, magnitude, CI_method) %>%
+    group_by(Timeperiod, Sex, Age,  magnitude, CI_method) %>%
     summarise(
+      n = n(),
+      Value_not_na = sum(is.na(Value)),
       Count = sum(Count),
       Denominator = sum(Denominator),
       .groups = 'keep'
     ) %>%
+    # Don't calculate ICB value if it doesn't include both Birmingham and Solihull
+    filter(n == 2 & Value_not_na == 2) %>%
     mutate(
       AreaCode = "E38000258",
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = Count + 0.5,
+      a_prime = Count + 1,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * Count * (1 - 1/(9*Count) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
-    ungroup() %>%
-    select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
-      LowerCI95, UpperCI95, magnitude, CI_method
-    )
-  
+    ungroup() 
   # 
   combined_data <- rbindlist(
     list(
-      df_LA, df_ICB, df_eng
+      select_final_cols(df_LA), 
+      select_final_cols(df_ICB), 
+      select_final_cols(df_eng)
     )
-  ) %>% 
-    select(-c(magnitude, CI_method))
+  ) 
   
   output <- list(
     "data" = combined_data,
@@ -188,11 +206,7 @@ process_GP_data <- function(FingerTips_id) {
   
   # England data
   df_eng <- data %>% 
-    filter(AreaCode == "E92000001") %>%
-    select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
-      LowerCI95, UpperCI95, magnitude, CI_method
-    )
+    filter(AreaCode == "E92000001")
   
   # Aggregate for PCNs
   df_PCN <- data %>%
@@ -209,28 +223,24 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = Count + 0.5,
+      a_prime = Count + 1,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * Count * (1 - 1/(9*Count) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
-    ungroup() %>%
-    select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
-      LowerCI95, UpperCI95, magnitude, CI_method
-    )
+    ungroup() 
       
   # Aggregate for Localities
-  df_Locality <- data %>%
-    inner_join(GP_lookup, 
-               join_by(AreaCode == "Practice_Code")) %>%
+  df_Locality <- df_PCN %>%
+    inner_join(PCN_lookup, 
+               join_by(AreaCode == "PCN_Code")) %>%
     group_by(LA_Code, Timeperiod, Sex, Age,  magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
@@ -242,28 +252,22 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = Count + 0.5,
+      a_prime = Count + 1,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * Count * (1 - 1/(9*Count) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
-    ungroup() %>%
-    select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
-      LowerCI95, UpperCI95, magnitude, CI_method
-    )
+    ungroup() 
 
   # Aggregate for local authorities
-  df_LA <- data %>%
-    inner_join(GP_lookup, 
-               join_by(AreaCode == "Practice_Code")) %>%
+  df_LA <- df_Locality %>%
     group_by(LA_Code, Timeperiod, Sex, Age, magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
@@ -275,65 +279,60 @@ process_GP_data <- function(FingerTips_id) {
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = Count + 0.5,
+      a_prime = Count + 1,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * Count * (1 - 1/(9*Count) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
-    ungroup() %>%
-    select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
-      LowerCI95, UpperCI95, magnitude, CI_method
-    )
+    ungroup() 
   
   # Aggregate for BSol ICB
-  df_ICB <- data %>%
-    inner_join(GP_lookup, 
-               join_by(AreaCode == "Practice_Code")) %>%
+  df_ICB <- df_LA %>%
     group_by(Timeperiod, Sex, Age,  magnitude, CI_method) %>%
     summarise(
+      n = n(),
       Count = sum(Count),
       Denominator = sum(Denominator),
       .groups = 'keep'
-    ) %>%
+    )  %>%
+    # Don't calculate ICB value if it doesn't include both Birmingham and Solihull
+    filter(n==2) %>%
     mutate(
       AreaCode = "E38000258",
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
-      a_prime = Count + 0.5,
+      a_prime = Count + 1,
       # Calculate errors
       Z = qnorm(0.975),
       LowerCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-        CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator
+        CI_method == "Byar's Method" ~ magnitude * Count * (1 - 1/(9*Count) - Z/3 * sqrt(1/a_prime))**3/Denominator
       ),
       UpperCI95 = case_when(
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
     ) %>% 
-    ungroup() %>%
-    select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
-      LowerCI95, UpperCI95, magnitude, CI_method
-    )
-  
+    ungroup() 
+
   # 
   combined_data <- rbindlist(
     list(
-      df_PCN, df_Locality, df_LA, df_ICB, df_eng
+      select_final_cols(df_PCN), 
+      select_final_cols(df_Locality), 
+      select_final_cols(df_LA), 
+      select_final_cols(df_ICB), 
+      select_final_cols(df_eng)
     )
-  ) %>% 
-    select(-c(magnitude, CI_method))
-  
+  ) 
   output <- list(
     "data" = combined_data,
     "meta" = meta
@@ -397,7 +396,7 @@ all_data <- list()
 all_meta <- list()
 
 for (i in 1:nrow(ids)){
-  
+  print(ids$FingerTips_id[[i]])
   if (ids$AreaType[i] == "GP") {
     data_i <- process_GP_data(ids$FingerTips_id[[i]])
   } 
