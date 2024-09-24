@@ -305,8 +305,8 @@ bcc_append <-
 bcc_append <-
   bcc_append %>% 
   bind_rows(
-    data.frame(DemographicLabel = "Female: 50-70 yrs"
-               , Gender = "Female"
+    data.frame(DemographicLabel = "Persons: 50-70 yrs"  # Updated to persons after indicator QA
+               , Gender = "Persons"
                , AgeGrp = "50-70 yrs"
                , IMD = NA
                , Ethnicity = NA)
