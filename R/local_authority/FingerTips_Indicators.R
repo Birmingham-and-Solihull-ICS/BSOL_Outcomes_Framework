@@ -407,6 +407,12 @@ for (i in 1:nrow(ids)){
   else {
     stop(error = "Unexpected AreaTypeID. Only GP (7) and LA (502) implemented.")
   }
+  
+  # Check that FingerTips provided at least one row of data
+  if (nrow(data_i[["data"]]) == 0) {
+    stop(error = paste("No data collected for FT ID:", ids$FingerTips_id[[i]]))
+  }
+  
   # Add in our indicator ID
   data_i[["data"]]$IndicatorID <- ids$IndicatorID[[i]]
   data_i[["meta"]]$IndicatorID <- ids$IndicatorID[[i]]  
@@ -473,7 +479,7 @@ meta <- readxl::read_excel(
 output_data <- collected_data %>%
   filter(
     # Remove rows with no data
-    !is.na(Value)
+    !is.na(Value) 
   ) %>%
   mutate(
     ValueID = "",
@@ -499,6 +505,10 @@ output_data <- collected_data %>%
     aggregations,
     join_by(AreaCode == "AggregationCode"),
     relationship = "many-to-one"
+  ) %>%
+  filter(
+    # Remove rows with no DemographicID
+    !is.na(DemographicID)
   ) %>%
   select(
     c("ValueID", "IndicatorID", "InsertDate", 
