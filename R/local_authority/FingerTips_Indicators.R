@@ -6,7 +6,7 @@ library(readxl)
 # Load indicator list
 ids <- read_excel(
   "../../data/LA_FingerTips_Indicators.xlsx",
-  sheet = "FT_indicators")
+  sheet = "FT_indicators") 
 
 # Load GP-PCN-Locality-LA lookup data
 GP_lookup <- read.csv("../../data/better-GP-lookup-march-2024.csv") %>%
@@ -55,7 +55,15 @@ fetch_data <- function(FingerTips_id, AreaTypeID) {
   data <- fingertips_data(
     AreaTypeID = AreaTypeID, 
     IndicatorID = FingerTips_id
-  )
+  ) 
+  
+  if (FingerTips_id == 93183) {
+    data <- data %>%
+      filter(
+        Age == "14+ yrs"
+      )
+  }
+  
   meta_data <- fetch_meta(FingerTips_id)
   
   return(
@@ -139,7 +147,7 @@ process_LA_data <- function(FingerTips_id) {
     group_by(Timeperiod, Sex, Age,  magnitude, CI_method) %>%
     summarise(
       n = n(),
-      Value_not_na = sum(is.na(Value)),
+      Value_not_na = sum(!is.na(Value)),
       Count = sum(Count),
       Denominator = sum(Denominator),
       .groups = 'keep'
@@ -164,7 +172,8 @@ process_LA_data <- function(FingerTips_id) {
       )
     ) %>% 
     ungroup() 
-  # 
+
+  
   combined_data <- rbindlist(
     list(
       select_final_cols(df_LA), 
@@ -430,7 +439,7 @@ collected_meta <- rbindlist(all_meta)
 ##               Collect Additional Meta Data                  ##
 #################################################################
 print("------------- Collecting additional meta data --------------")
-meta_ids <- ids <- read_excel(
+meta_ids <- read_excel(
   "../../data/LA_FingerTips_Indicators.xlsx",
   sheet = "meta_only")
 # Get additional meta data
@@ -438,7 +447,7 @@ additional_meta_list <- list()
 
 for (i in 1:nrow(meta_ids)) {
   meta_data_i <- fetch_meta(meta_ids$FingerTips_ID[[i]])
-  meta_data_i$IndicatorID <- ids$IndicatorID[[i]]
+  meta_data_i$IndicatorID <- meta_ids$IndicatorID[[i]]
   additional_meta_list[[i]] <- meta_data_i
 }
 
