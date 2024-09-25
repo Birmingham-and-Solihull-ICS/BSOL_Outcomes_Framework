@@ -194,7 +194,7 @@ process_GP_data <- function(FingerTips_id) {
     mutate(
       LowerCI95 = LowerCI95.0limit, 
       UpperCI95 = UpperCI95.0limit
-    ) %>%
+      )%>%
     select(
       AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
       LowerCI95, UpperCI95
@@ -241,14 +241,14 @@ process_GP_data <- function(FingerTips_id) {
   df_Locality <- df_PCN %>%
     inner_join(PCN_lookup, 
                join_by(AreaCode == "PCN_Code")) %>%
-    group_by(LA_Code, Timeperiod, Sex, Age,  magnitude, CI_method) %>%
+    group_by(Locality_Code, LA_Code, Timeperiod, Sex, Age,  magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
       Denominator = sum(Denominator),
       .groups = 'keep'
     ) %>%
     mutate(
-      AreaCode = LA_Code,
+      AreaCode = Locality_Code,
       p_hat = Count / Denominator,
       Value = magnitude * p_hat,
       # for use in Byar's method
@@ -333,6 +333,7 @@ process_GP_data <- function(FingerTips_id) {
       select_final_cols(df_eng)
     )
   ) 
+  
   output <- list(
     "data" = combined_data,
     "meta" = meta
@@ -435,7 +436,7 @@ for (i in 1:nrow(meta_ids)) {
   additional_meta_list[[i]] <- meta_data_i
 }
 
-collected_additional_meta <- rbindlist(additional_meta_list) 
+collected_additional_meta <- rbindlist(additional_meta_list)
 
 #################################################################
 ##                Mutate into Staging Table                    ##
