@@ -133,6 +133,11 @@ LARC_GP <- all_larc_data %>%
 GP_lookup <- readxl::read_excel("../../data/gp-mega-map-march-2024.xlsx") %>%
   select(c("Practice Code", "Locality", "PCN"))
 
+PCN_lookup <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "PCN-Locality-Lookup"
+)
+
 # OF Aggregation look-up
 OF_aggs <- readxl::read_excel(
   "../../data/OF-Other-Tables.xlsx", sheet = "Aggregation"
@@ -163,14 +168,14 @@ LARC_PCN <- LARC_GP %>%
   ungroup() %>% 
   select(
     c("Numerator", "Denominator", "IndicatorValue",
-      "AggregationID", "quarter")
+      "AggregationID", "quarter", "AggregationCode")
   )
 
 # Group by Locality
-LARC_Locality <- LARC_GP %>%
+LARC_Locality <- LARC_PCN %>%
   left_join(
-    GP_lookup,
-    by = "Practice Code"
+    PCN_lookup,
+    by = c("AggregationCode"  = "PCN_Code" ) 
   ) %>%
   group_by(quarter, Locality) %>%
   summarise(
@@ -208,7 +213,7 @@ LARC_Birmingham <- LARC_GP %>%
     c("quarter", "IndicatorValue", "Numerator", "Denominator")
   ) %>%
   mutate(
-    AggregationID = 135
+    AggregationID = 147
   ) %>% select(
     c("Numerator", "Denominator", "IndicatorValue",
       "AggregationID", "quarter")
@@ -216,7 +221,7 @@ LARC_Birmingham <- LARC_GP %>%
   
 # Combine PCN, locality, and LA parts
 output_df <- rbind(
-  LARC_PCN,
+  LARC_PCN %>% select(-c(AggregationCode)),
   LARC_Locality,
   LARC_Birmingham
 )  %>%
@@ -236,8 +241,8 @@ output_df <- rbind(
     # Calculate 95% Wilson confidence interval
     Z = qnorm(0.975),
     p_hat = IndicatorValue / 1000,
-    a_prime = Numerator + 0.5,
-    LowerCI95 = 1000 * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator,
+    a_prime = Numerator + 1,
+    LowerCI95 = 1000 * Numerator * (1 - 1/(9*Numerator) - Z/3 * sqrt(1/Numerator))**3/Denominator,
     UpperCI95 = 1000 * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
   ) %>%
   select(
