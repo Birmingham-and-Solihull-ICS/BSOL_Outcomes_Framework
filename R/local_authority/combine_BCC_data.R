@@ -21,9 +21,9 @@ for (i in 1:length(dfs)) {
     dfs[[i]] <- dfs[[i]] %>%
       mutate(
         IndicatorValue = 1000 * Numerator / Denominator,
-        a_prime = Numerator + 0.5,
+        a_prime = Numerator + 1,
         Z = qnorm(0.975),
-        LowerCI95 = 1000 * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator,
+        LowerCI95 = 1000 * Numerator * (1 - 1/(9*Numerator) - Z/3 * sqrt(1/Numerator))**3/Denominator,
         UpperCI95 = 1000 * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator,
         DemographicID = case_when(
           DemographicID == "Male" ~ 3,
@@ -58,10 +58,35 @@ for (i in 1:length(dfs)) {
 }
 
 # Combine dfs
-OF_values <- bind_rows(dfs)
+OF_values <- bind_rows(dfs) %>%
+  # Work around the Byar's 0 count problem
+  mutate(
+    LowerCI95 = case_when(
+      is.na(LowerCI95) ~ 0,
+      TRUE ~ LowerCI95
+    )
+  )
 # Remove any value IDs
 OF_values$ValueID = NA
 
+
+
+
+#################################################################
+###                Solihull as a Locality                     ###
+#################################################################
+
+solihull_as_LA <- OF_values %>%
+  filter(
+    IndicatorID %in% c(8,9) &
+      AggregationID == 146
+  ) %>%
+  mutate(
+    AggregationID = 134
+  )
+
+OF_values <- rbind(OF_values, solihull_as_LA) %>%
+  arrange(IndicatorID)
 
 #################################################################
 ###                   Combine meta Data                       ###

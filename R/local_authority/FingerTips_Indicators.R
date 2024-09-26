@@ -6,7 +6,7 @@ library(readxl)
 # Load indicator list
 ids <- read_excel(
   "../../data/LA_FingerTips_Indicators.xlsx",
-  sheet = "FT_indicators") 
+  sheet = "FT_indicators")
 
 # Load GP-PCN-Locality-LA lookup data
 GP_lookup <- read.csv("../../data/better-GP-lookup-march-2024.csv") %>%
@@ -173,7 +173,6 @@ process_LA_data <- function(FingerTips_id) {
     ) %>% 
     ungroup() 
 
-  
   combined_data <- rbindlist(
     list(
       select_final_cols(df_LA), 
@@ -368,6 +367,13 @@ start_date <- function(date) {
       sprintf("%s/01/01", date),
       format = "%Y/%m/%d")
   }
+  # if multi year e.g. 2012 - 2014
+  else if (grepl("^\\d{4} - \\d{2}$",date)) {
+    Year_Start = stringr::str_extract(date,"^\\d{4}")
+    start_date <- as.Date(
+      sprintf("%s/01/01", Year_Start),
+      format = "%Y/%m/%d")
+  }
   # Otherwise raise error
   else{
     stop(error = "Can't convert date. Unexpected format for TimePeriod.")
@@ -388,6 +394,12 @@ end_date <- function(date) {
   else if (grepl("^\\d{4}$",date)) {
     start_date <- as.Date(
       sprintf("%s/12/31", date), 
+      format = "%Y/%m/%d")
+  }
+  else if (grepl("^\\d{4} - \\d{2}$",date)) {
+    Year_End = stringr::str_extract(date,"\\d{2}$")
+    start_date <- as.Date(
+      sprintf("20%s/01/01", Year_End),
       format = "%Y/%m/%d")
   }
   # Otherwise raise error
