@@ -173,7 +173,7 @@ solihull_data <- data.table::rbindlist(all_solihull_files)
 
 # Combine GP population files and calculate 40-74 populations
 GP_pops40to74 <- readxl::read_excel(
-  '../../data/BSOL GP Population List.xlsx',
+  'Z:/2.0 KNOWLEDGE EVIDENCE & GOVERNANCE - KEG/2.12 PHM AND RESEARCH/Data/Primary Care/BSOL GP Population List - Sept 2023.xlsx',
   sheet = "Dataset"
   ) %>%
   filter(
@@ -262,7 +262,7 @@ PCN_HC_received <- BSol_data %>%
       "../../data/OF-Other-Tables.xlsx",
       sheet = "Aggregation") %>%
       filter(AggregationType == "PCN") %>%
-      select(c(AggregationID, AggregationLabel)),
+      select(c(AggregationID, AggregationLabel, AggregationCode)),
     by = c(PCN = "AggregationLabel"),
     mode='left',
     method = "jw", #use jw distance metric
@@ -273,7 +273,7 @@ PCN_HC_received <- BSol_data %>%
   select(
     c(ValueID, IndicatorID, InsertDate, Numerator, Denominator, IndicatorValue, 
       LowerCI95, UpperCI95, AggregationID, DemographicID, DataQualityID, 
-      IndicatorStartDate ,IndicatorEndDate
+      IndicatorStartDate ,IndicatorEndDate, AggregationCode
     )
   )
 
@@ -281,11 +281,20 @@ PCN_HC_received <- BSol_data %>%
 ###                Calculate Locality values                  ###
 #################################################################
 
-locality_HC_received <- BSol_data %>%
-  group_by(Locality, year, quarter) %>%
+PCN_lookup <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "PCN-Locality-Lookup"
+)
+
+locality_HC_received <- PCN_HC_received %>%
+  left_join(
+    PCN_lookup,
+    by = c("AggregationCode"  = "PCN_Code" ) 
+  ) %>%
+  group_by(Locality, IndicatorStartDate, IndicatorEndDate) %>%
   summarise(
-    Numerator = sum(HC_complete),
-    Denominator = sum(estimated_number_eligible)
+    Numerator = sum(Numerator),
+    Denominator = sum(Denominator)
   ) %>% 
   mutate(
     ValueID = "",
@@ -295,15 +304,9 @@ locality_HC_received <- BSol_data %>%
     Z = qnorm(0.975),
     p_hat = IndicatorValue / 100,
     LowerCI95 = 100 * (p_hat + Z^2/(2*Denominator) - Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
-    UpperCI95 = 1000 * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+    UpperCI95 = 100 * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
     DemographicID = 82,
-    DataQualityID = 1,
-    # Calculate indicator start and end dates
-    Year_Start = stringr::str_extract(year,"^(\\d{4})"),
-    IndicatorStartDate = as.Date(sprintf("%s/04/01", Year_Start)) %m+% 
-      months(3 * (quarter - 1)),
-    IndicatorEndDate = as.Date(sprintf("%s/06/30", Year_Start)) %m+% 
-      months(3 * (quarter - 1)),
+    DataQualityID = 1
   ) %>%
   fuzzyjoin::stringdist_join(
     readxl::read_excel(
@@ -420,7 +423,7 @@ ICB_HC_received <- BSol_data %>%
 
 # Bind aggregation levels
 HC_output <- rbind(
-  PCN_HC_received, 
+  PCN_HC_received %>% select(-c(AggregationCode)), 
   locality_HC_received, 
   LA_HC_received, 
   ICB_HC_received
