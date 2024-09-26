@@ -1,18 +1,3 @@
-
-##########################INSTRUCTIONS##########################################################
-# 1. Go to Step 3: Get numerator data                                                         ##
-# 2. Insert the indicator ID that you wish to extract data from database                      ##  
-# 3. If you want to process one indicator at a time:                                          ## 
-#     - Run the code from the beginning until Step 6.1                                        ## 
-#     - Ensure that you specify the parameters for that indicator                             ## 
-#     - And the indicator_data contains the indicator ID that you wish to process             ## 
-#     - If necessary, filter the indicator_data to include the relevant indicator ID          ## 
-# 4. If you want to process multiple indicators at the same time:                             ## 
-#    - Ensure that you've filled in the parameter_combinations.xlsx file with the indicators  ## 
-#    - Run the code from the beginning until Step 6.2 (skip Step 6.1)                         ## 
-################################################################################################
-    
-
 library(tidyverse)
 library(janitor)
 library(DBI)
@@ -94,7 +79,7 @@ query <- paste0("SELECT * FROM EAT_Reporting_BSOL.[OF].IndicatorData
 indicator_data <- dbGetQuery(con, query) %>% 
   as_tibble() %>% 
   mutate(Ethnicity_Code = trimws(Ethnicity_Code))   # Remove trailing spaces
-  
+
 #4. Data preparation -----------------------------------------------------------
 ##4.1 Function 1: Create aggregated data ---------------------------------------
 
@@ -104,7 +89,12 @@ indicator_data <- dbGetQuery(con, query) %>%
 # type: Specifies which aggregated data needs to be created; default is "numerator"
 
 create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator") {
+  
   aggregated_data = list()
+  
+  # Get the minimum available fiscal year start
+  min_fiscal_year <- as.numeric(substr(min(data$FiscalYear), 1, 4))
+  
   
   for (year in agg_years){
     # Initial filter based on the aggregation year
@@ -112,16 +102,18 @@ create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator"
       aggregated_data[[paste0(year, "YR_data")]] <- data %>%
         mutate(
           FiscalYearStart = as.numeric(substr(FiscalYear, 1, 4)),
-          PeriodStart = (FiscalYearStart %/% year) * year,
-          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 3),
+          PeriodStart = FiscalYearStart - ((FiscalYearStart - min_fiscal_year) %% year),
+          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 3),  # 3-year rolling period
           AggYear = year
         ) 
     }
-    else{
+    else if (year == 5) {
       aggregated_data[[paste0(year, "YR_data")]] <- data %>%
         mutate(
-          FiscalYearStart = 2019,
-          FiscalYear = paste0(FiscalYearStart, "/", FiscalYearStart + 5),
+          FiscalYearStart = as.numeric(substr(FiscalYear, 1, 4)),
+          # Ensure rolling years are consecutive
+          PeriodStart = min_fiscal_year + floor((FiscalYearStart - min_fiscal_year) / year) * year,
+          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 5),  # 5-year rolling period
           AggYear = year
         )
     }
@@ -142,7 +134,7 @@ create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator"
           NHSCodeDefinition, ONSGroup, Quantile, AgeB18CategoriesCode,AgeB18Categories, FiscalYear, AggYear
         ) %>%
         summarise(
-          Denominator = mean(Denominator, na.rm = TRUE), # Get the mean of the denominator instead of the sum 
+          Denominator = sum(Denominator, na.rm = TRUE), # Get the sum of denominator
           .groups = 'drop'
         ) 
     }
@@ -150,7 +142,7 @@ create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator"
   }
   # Combine both 3- and 5-year aggregated data
   output <- bind_rows(aggregated_data)
-
+  
   return(output)
 }
 
@@ -189,7 +181,7 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
   filtered_output <- filtered_data %>%
     group_by(IndicatorID, ReferenceID, Ethnicity_Code, LSOA_2021, Age, Financial_Year) %>% 
     summarise(Numerator = sum(Numerator, na.rm = TRUE), .groups = 'drop')
-
+  
   # Create 5-year age bands
   # Define the labels for the age bands
   age_labels <- c(
@@ -212,7 +204,7 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
     "Aged 80 to 84 years",
     "Aged 85 years and over"
   )
-
+  
   # Create age bands and assign labels
   output <- filtered_output %>%
     mutate(
@@ -223,8 +215,8 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
                          include.lowest = TRUE),              # Includes the lowest value in the first interval, covering ages 0 to 4.
       AgeBandCategory = age_labels[AgeBandCode]               # Uses the code to look up the corresponding label
     )
-
-
+  
+  
   # Process the data to generate the output
   output <- output %>%
     left_join(ethnicity_map, by = c("Ethnicity_Code" = "NHSCode")) %>%
@@ -236,23 +228,23 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
     mutate(Fiscal_Year = str_replace(Fiscal_Year, "-", "/20"),
            AggYear = 1) %>%
     clean_names(case = "upper_camel", abbreviations = c("WD", "LAD", "CD", "NM", "ONS"))
-
+  
   # Get the aggregated numerator data for 3- and 5-year rolling periods
   aggregated_data <- create_aggregated_data(output, agg_years = c(3, 5), type = "numerator")
-
+  
   # Combine all data into one dataframe
   output <- bind_rows(output,aggregated_data)
-
+  
   return(output)
   
-  }
- 
+}
+
 # Example
 # my_numerator <- get_numerator(indicator_data = indicator_data,
-#                               indicator_id = 114,
-#                               reference_id = 41401,
-#                               min_age = 65,
-#                               max_age = NA)
+#                               indicator_id = 109,
+#                               reference_id = "90808",
+#                               min_age = 15,
+#                               max_age = 24)
 
 
 ##4.3 Function 3: Create denominator dataset  ----------------------------------
@@ -307,7 +299,7 @@ get_denominator <- function(pop_estimates, numerator_data){
   
   # Combine all data into one dataframe
   output <- bind_rows(output,aggregated_data)
-
+  
   return(output)
 } 
 
@@ -322,7 +314,7 @@ standard_pop <- popfile_ward %>%
   select(
     AgeBandCode = age_b_18_categories_code,
     AgeBandCategory = age_b_18_categories
-    ) %>% 
+  ) %>% 
   distinct() %>%
   mutate(
     Population = case_when(
@@ -396,7 +388,7 @@ get_summarized_data <- function(id, group_vars, year, denominator_data, numerato
 # Main function to calculate age-standardised rate
 calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_data, aggID, genderGrp, ageGrp, multiplier = 100000) {
   
-
+  
   # Aggregation years to calculate age-standardised rates for 1, 3 and 5 rolling periods
   AggYears <- c(1, 3, 5)
   
@@ -413,9 +405,9 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
         left_join(numerator_data %>% 
                     filter(AggYear == year), 
                   by = c("ElectoralWardsAndDivisionsCode" = "WD22CD",
-                          "NHSCode" = "EthnicityCode",
-                          "FiscalYear" = "FiscalYear",
-                          "AgeB18CategoriesCode" = "AgeBandCode")) # Added age band
+                         "NHSCode" = "EthnicityCode",
+                         "FiscalYear" = "FiscalYear",
+                         "AgeB18CategoriesCode" = "AgeBandCode")) # Added age band
       
       # Conditional operations for different levels of aggregations
       if (id == "WD22NM") {
@@ -573,7 +565,7 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
     
     # Add the rest of the variables as per the OF data model
     output <- final_results %>%
-      filter(FiscalYear != '2013/2014') %>%
+      # filter(FiscalYear != '2013/2014') %>%
       mutate(
         IndicatorID = indicator_id,
         InsertDate = today(),
@@ -588,18 +580,18 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
         StatusID, DataQualityID, IndicatorStartDate, IndicatorEndDate
       )
   }
- 
+  
   return(output)
 }
 
 # Example
 # result <- calculate_age_std_rate(
-#   indicator_id = 114,
+#   indicator_id = 109,
 #   denominator_data = my_denominator,
 #   numerator_data = my_numerator,
 #   aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
 #   genderGrp = "Persons",
-#   ageGrp = "65+ yrs",
+#   ageGrp = "15-24 yrs",
 #   multiplier = 100000
 # )
 
@@ -736,19 +728,20 @@ results <- indicators_params %>% # Filtered to indicators requiring age-standard
   do(process_parameters(.)) %>%  # Apply the function to each row
   ungroup() #Remove the rowwise grouping, so the output is a simple tibble
 
-# Remove the '2024/2025' Fiscal Year from the final output
+# Remove the '2024/2025' Fiscal Year from the final output and future dates
 results <- results %>% 
-  filter(FiscalYear != '2024/2025')
+  filter(FiscalYear != '2024/2025') %>% 
+  filter(!(as.Date(IndicatorEndDate, format = "%Y-%m-%d") > as.Date("2024-04-01", format = "%Y-%m-%d")))
 
 #7. Write into database ----------------------------------------------------------
 
 sql_connection <- dbConnect(
-    odbc(),
-    Driver = "SQL Server",
-    Server = "MLCSU-BI-SQL",
-    Database = "Working",
-    Trusted_Connection = "True"
-    )
+  odbc(),
+  Driver = "SQL Server",
+  Server = "MLCSU-BI-SQL",
+  Database = "Working",
+  Trusted_Connection = "True"
+)
 
 # Overwrite the existing table
 dbWriteTable(
@@ -757,7 +750,7 @@ dbWriteTable(
   results, # Processed dataset
   # append = TRUE # Append the data to the existing table
   overwrite = TRUE
-  )
+)
 
 # End the timer
 end_time <- Sys.time()

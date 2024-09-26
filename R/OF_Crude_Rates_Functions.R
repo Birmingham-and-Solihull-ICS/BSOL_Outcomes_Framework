@@ -12,8 +12,6 @@
 #    - Run the code from the beginning until Step 6.2 (skip Step 6.1)                         ## 
 ################################################################################################
 
-
-
 library(tidyverse)
 library(janitor)
 library(DBI)
@@ -84,20 +82,6 @@ popfile_ward <- read.csv("data/C21_a86_e20_ward.csv", header = TRUE, check.names
 #3. Get numerator data ---------------------------------------------------------
 #3.1 Load the indicator data from the warehouse --------------------------------
 
-# # Read the Excel file to get the available indicators
-# parameter_combinations <- read_excel("data/parameter_combinations.xlsx", 
-#                                      sheet = "crude_indicators")
-# 
-# # Filter based on indicators requiring age-standardization
-# indicators_params <- parameter_combinations %>% 
-#   filter(StandardizedIndicator == 'N' & PredeterminedDenominator == "N") %>%  # The flag used to choose which indicators 
-#   filter(IndicatorID %in% c(32))
-# 
-# # Get the unique indicator IDs to be used for importing data from database
-# indicator_ids <- unique(indicators_params$IndicatorID)
-# 
-# # Convert the indicator IDs to a comma-separated values
-# indicator_ids <- paste(indicator_ids, collapse = ", ")
 
 # Insert which indicator IDs to extract
 indicator_ids <- c(14, 18, 31, 32, 48, 87, 88, 108, 117)
@@ -125,53 +109,60 @@ indicator_data <- dbGetQuery(con, query) %>%
 # agg_years: Aggregation years for creating the aggregated data
 # type: Specifies which aggregated data needs to be created; default is "numerator"
 
+
 create_aggregated_data <- function(data, agg_years = c(3, 5), type = "numerator") {
   
   aggregated_data = list()
   
-  for (year in agg_years){
-    # Initial filter based on the aggregation year
-    if(year == 3){
+  # Get the minimum available fiscal year start
+  min_fiscal_year <- as.numeric(substr(min(data$FiscalYear), 1, 4))
+  
+  for (year in agg_years) {
+    if (year == 3) {
       aggregated_data[[paste0(year, "YR_data")]] <- data %>%
         mutate(
           FiscalYearStart = as.numeric(substr(FiscalYear, 1, 4)),
-          PeriodStart = (FiscalYearStart %/% year) * year,
-          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 3),
+          PeriodStart = FiscalYearStart - ((FiscalYearStart - min_fiscal_year) %% year),
+          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 3),  # 3-year rolling period
           AggYear = year
-        ) 
-    }
-    else{
+        )
+    } else if (year == 5) {
       aggregated_data[[paste0(year, "YR_data")]] <- data %>%
         mutate(
-          FiscalYearStart = 2019,
-          FiscalYear = paste0(FiscalYearStart, "/", FiscalYearStart + 5),
+          FiscalYearStart = as.numeric(substr(FiscalYear, 1, 4)),
+          # Ensure rolling years are consecutive
+          PeriodStart = min_fiscal_year + floor((FiscalYearStart - min_fiscal_year) / year) * year,
+          FiscalYear = paste0(PeriodStart, "/", PeriodStart + 5),  # 5-year rolling period
           AggYear = year
         )
     }
     
-    # Filter based on the aggregated data type 
-    if(type == "numerator"){
-      aggregated_data[[paste0(year, "YR_data")]] <- aggregated_data[[paste0(year, "YR_data")]] %>% 
+    # Aggregation logic based on the 'type' argument
+    if (type == "numerator") {
+      # Aggregate for numerator data
+      aggregated_data[[paste0(year, "YR_data")]] <- aggregated_data[[paste0(year, "YR_data")]] %>%
         group_by(
           FiscalYear, AggYear, EthnicityCode, LAD22CD, WD22CD, WD22NM, Locality
         ) %>%
         summarise(
-          Numerator = sum(Numerator, na.rm = TRUE), .groups = 'drop'
-        ) 
-    } else{
-      aggregated_data[[paste0(year, "YR_data")]] <- aggregated_data[[paste0(year, "YR_data")]] %>% 
+          Numerator = sum(Numerator, na.rm = TRUE), 
+          .groups = 'drop'
+        )
+    } else {
+      # Aggregate for denominator data
+      aggregated_data[[paste0(year, "YR_data")]] <- aggregated_data[[paste0(year, "YR_data")]] %>%
         group_by(
-          ElectoralWardsAndDivisionsCode, ElectoralWardsAndDivisions,EthnicGroup20CategoriesCode, NHSCode, 
-          NHSCodeDefinition, ONSGroup, Quantile, FiscalYear, AggYear
+          FiscalYear, AggYear, ElectoralWardsAndDivisionsCode, ElectoralWardsAndDivisions, 
+          EthnicGroup20CategoriesCode, NHSCode, NHSCodeDefinition, ONSGroup, Quantile
         ) %>%
         summarise(
-          Denominator = mean(Denominator, na.rm = TRUE), # Get the mean of the denominator instead of the sum 
+          Denominator = sum(Denominator, na.rm = TRUE),  # Ensure Denominator is summed correctly across years
           .groups = 'drop'
-        ) 
+        )
     }
-    
   }
-  # Combine both 3- and 5-year aggregated data
+  
+  # Combine both 3- and 5-year aggregated data into a single output
   output <- bind_rows(aggregated_data)
   
   return(output)
@@ -553,7 +544,7 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
   
   # Add the rest of the variables as per the OF data model
   output <- final_results %>%
-    filter(FiscalYear != '2013/2014') %>%
+    # filter(FiscalYear != '2013/2014') %>%
     mutate(
       IndicatorID = indicator_id,
       InsertDate = today(),
@@ -581,7 +572,6 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
 #   multiplier = 100000
 # )
 
-
 #6. Process all parameters -------------------------------------------------------
 
 ## 6.1 Optional: Process one indicator at a time -------------------------------
@@ -598,7 +588,7 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
 ## Use 'result' variable to write the data into database (Step 7)
 
 # my_numerator <- get_numerator(indicator_data = indicator_data,
-#                                    indicator_id = 115,
+#                                    indicator_id = 117,
 #                                    min_age = NA,
 #                                    max_age = 74)
 # 
@@ -608,7 +598,7 @@ calculate_crude_rate <- function(indicator_id, denominator_data, numerator_data,
 #                                     numerator_data = my_numerator)
 # 
 # result <- calculate_crude_rate(
-#   indicator_id = 87,
+#   indicator_id = 117,
 #   denominator_data = my_denominator,
 #   numerator_data = my_numerator,
 #   aggID = c("BSOL ICB", "WD22NM", "LAD22CD", "Locality"),
@@ -714,11 +704,14 @@ process_parameters <- function(row) {
 results <- indicators_params %>%
   rowwise() %>% # This ensures each row is treated as a separate set of inputs
   do(process_parameters(.)) %>%  # Apply the function to each row
-  ungroup() #Remove the rowwise grouping, so the output is a simple tibble
+  ungroup()  #Remove the rowwise grouping, so the output is a simple tibble
+  
 
-# Remove the '2024/2025' Fiscal Year from the final output
-results <- results %>% 
-  filter(FiscalYear != '2024/2025')
+# Remove the '2024/2025' Fiscal Year from the final output and future dates
+results <- result %>% 
+  filter(FiscalYear != '2024/2025') %>% 
+  filter(!(as.Date(IndicatorEndDate, format = "%Y-%m-%d") > as.Date("2024-04-01", format = "%Y-%m-%d")))
+
 
 # Write into database ----------------------------------------------------------
 
@@ -736,7 +729,7 @@ dbWriteTable(
   sql_connection,
   Id(schema = "dbo", table = "BSOL_0033_OF_Crude_Rates"),
   results, # Processed dataset
-  # append = TRUE # Append data to the existing table
+# append = TRUE # Append data to the existing table
   overwrite = TRUE
 )
 
