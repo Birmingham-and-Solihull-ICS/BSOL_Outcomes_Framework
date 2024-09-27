@@ -36,7 +36,7 @@ for (i in 1:length(dfs)) {
           TRUE ~ NA
         ),
         DataQualityID = 1,
-        InsertDate = "2024-04-30"
+        InsertDate = as.Date("30/04/2024", format  = "%d/%m/%Y") 
       ) %>%
       select(-c(a_prime, Z))
   }
@@ -46,8 +46,18 @@ for (i in 1:length(dfs)) {
     mutate(
       # Standardise insert date formats
       InsertDate = case_when(
-        grepl("\\d{2}/\\d{2}/\\d{4}", InsertDate) ~ as.Date(InsertDate, fmt = "%d/%m/%Y"),
-        grepl("\\d{4}-\\d{2}-\\d{2}", InsertDate) ~ as.Date(InsertDate),
+        grepl("\\d{2}/\\d{2}/\\d{4}", InsertDate) ~ as.Date(InsertDate, format  = "%d/%m/%Y"),
+        grepl("\\d{4}-\\d{2}-\\d{2}", InsertDate) ~ as.Date(InsertDate, format  = "%Y-%m-%d"),
+        TRUE ~ NA
+      ),
+      IndicatorStartDate = case_when(
+        grepl("\\d{2}/\\d{2}/\\d{4}", IndicatorStartDate) ~ as.Date(IndicatorStartDate, format  = "%d/%m/%Y"),
+        grepl("\\d{4}-\\d{2}-\\d{2}", IndicatorStartDate) ~ as.Date(IndicatorStartDate, format  = "%Y-%m-%d"),
+        TRUE ~ NA
+      ),
+      IndicatorEndDate = case_when(
+        grepl("\\d{2}/\\d{2}/\\d{4}", IndicatorEndDate) ~ as.Date(IndicatorEndDate, format  = "%d/%m/%Y"),
+        grepl("\\d{4}-\\d{2}-\\d{2}", IndicatorEndDate) ~ as.Date(IndicatorEndDate, format  = "%Y-%m-%d"),
         TRUE ~ NA
       )
       ) %>%
@@ -56,7 +66,7 @@ for (i in 1:length(dfs)) {
              "DemographicID", "DataQualityID", "IndicatorStartDate", "IndicatorEndDate" ))
   
 }
-
+bind_rows(dfs)
 # Combine dfs
 OF_values <- bind_rows(dfs) %>%
   # Work around the Byar's 0 count problem
@@ -68,8 +78,6 @@ OF_values <- bind_rows(dfs) %>%
   )
 # Remove any value IDs
 OF_values$ValueID = NA
-
-
 
 
 #################################################################
@@ -154,8 +162,8 @@ if ((any(OF_values$LowerCI95 > OF_values$IndicatorValue))) {
 } 
 
 # Check that dates make sense
-if (min(OF_values$IndicatorStartDate) < as.Date("01/01/2000")) {
-  stop("Minimum date out before 01/01/2020.")
+if (min(OF_values$IndicatorStartDate) < as.Date("01/01/1997",format = "%d/%m/%Y")) {
+  stop("Minimum date out before 01/01/1997.")
 } else if (max(OF_values$IndicatorStartDate) > Sys.Date()) {
   stop("Maximum dates is in the future.")
 }

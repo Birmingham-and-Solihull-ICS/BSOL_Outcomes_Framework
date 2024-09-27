@@ -430,4 +430,4 @@ HC_output <- rbind(
   )
 
 # save as csv
-write.csv(HC_output, "../../data/output/birmingham-source/0071_eligible_patients_receiving_an_NHS_health_check.csv")
+write.csv(HC_output, "../../data/output/birmingham-source/data/0071_eligible_patients_receiving_an_NHS_health_check.csv")
