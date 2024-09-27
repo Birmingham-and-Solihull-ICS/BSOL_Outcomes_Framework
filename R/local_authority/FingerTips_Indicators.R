@@ -533,7 +533,7 @@ output_data <- collected_data %>%
   ) %>%
   select(
     c("ValueID", "IndicatorID", "InsertDate", 
-      "Numerator", "Denominator", "IndicatorValue","LowerCI95", "UpperCI95", 
+      "Numerator", "Denominator", "IndicatorValue", "LowerCI95", "UpperCI95", 
       "AggregationID", "DemographicID", "DataQualityID",
       "IndicatorStartDate","IndicatorEndDate"
     )
@@ -575,12 +575,30 @@ output_meta <- collected_meta %>%
     `Definition of denominator` = case_when(
       IndicatorID == 118 ~ "The number of adults in drug treatment in the local authority.",
       IndicatorID == 119 ~ "The number of adults in alcohol treatment in the local authority.",
+      IndicatorID == 130 ~ "GP-registered female population aged 15-44 years.",
       TRUE ~ `Definition of numerator`
     ),
     `Rate Type` = case_when(
       IndicatorID %in% c(118,119) ~ "Crute rate per 1,000",
       TRUE ~ `Rate Type`
+    ),
+    `Definition of numerator` = case_when(
+      IndicatorID == 130 ~ "GP prescribed long acting reversible contraception excluding injections",
+      TRUE ~ `Simple Definition`
+    ),
+    `Simple Definition` = case_when(
+      IndicatorID == 130 ~ "Crude rate of GP prescribed long acting reversible contraception excluding injections per 1,000 GP-registered female population aged 15-44 years",
+      TRUE ~ `Simple Definition`
+    ),
+    `Source of denominator` =  case_when(
+      IndicatorID == 130 ~ "Birmingham and Solihull GP registration data.",
+      TRUE ~ `Source of denominator`
+    ),
+    `Source of numerator`=  case_when(
+      IndicatorID == 130 ~ "Birmingham City Council LARC contract data.",
+      TRUE ~ `Source of numerator`
     )
+    
   ) %>%
   select(-c(Unit, Methodology, WrittenDefinition)) %>%
   tidyr::pivot_longer(
