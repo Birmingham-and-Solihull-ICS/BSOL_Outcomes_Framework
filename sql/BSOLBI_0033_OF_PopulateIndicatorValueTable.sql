@@ -61,30 +61,9 @@ left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((sr.IMD=d.IMD) or (sr.IM
 													and d.AgeGrp=sr.AgeGroup
 
 
---select count(*) from Working.dbo.BSOL_0033_OF_Age_Standardised_Rates  --189200
+--select count(*) from Working.dbo.BSOL_0033_OF_Age_Standardised_Rates  --318200
 
 --select count(*) from #sr
-
---insert into #sr
---select sr2.IndicatorID
---		,sr2.InsertDate
---		,sr2.Numerator
---		,sr2.Denominator
---		,sr2.IndicatorValue
---		,sr2.lowercl as LowerCI95 
---		,sr2.uppercl as UpperCI95
---		,ag.AggregationID
---		,d.DemographicID
---		,sr2.DataQualityID
---		,sr2.IndicatorStartDate
---		,sr2.IndicatorEndDate
-
---from  Working.[dbo].[BSOL_0033_OF_93231_Stroke_StandardisedRate] sr2
---left join EAT_Reporting_BSOL.[OF].[Aggregation] ag on (sr2.AggID=ag.AggregationLabel and sr2.AggType=ag.AggregationType ) or  (sr2.AggID=ag.AggregationCode and sr2.AggType=ag.AggregationType )
---left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((sr2.IMD=d.IMD) or (sr2.IMD is null and d.IMD is null))--	and not (sr.IMD is not null and d.IMD is null)	and not (sr.IMD is null and d.IMD is not null))
---													and ((sr2.Ethnicity=d.Ethnicity) or (sr2.Ethnicity is null and d.Ethnicity is null))-- and not (sr.Ethnicity is not null and d.Ethnicity is null)	and not (sr.Ethnicity is null and d.Ethnicity is not null))
---													and sr2.Gender=d.Gender
---													and d.AgeGrp='All ages'
 
 
 
@@ -94,7 +73,6 @@ into EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
 from #sr
 
 select distinct IndicatorID from  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
-
 order by IndicatorID
 
 /**********************************************************************************************************/
@@ -134,23 +112,22 @@ left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((cr.IMD=d.IMD) or (cr.IM
 
 --where AggregationID is null
 --order by AggregationID
---select top 10* from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_CrudeRate] --38340
 
---select * from  Working.[dbo].[BSOL_0033_OF_Crude_Rates]
---where IMD is null and EthnicityCode is null and Gender is null and AgeGroup is null
---where AggregationLabel is null
+--select count(*) from Working.[dbo].[BSOL_0033_OF_Crude_Rates]  --251340
+
+--select count(*) from #cr
 
 drop table if exists EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
 select * 
 into EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
 from #cr
 
-select distinct IndicatorID from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
-order by IndicatorID
+--select distinct IndicatorID from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
+--order by IndicatorID
 
 
-select distinct (AgeGrp)  from [EAT_Reporting_BSOL].[OF].[Demographic]
-order by AgeGrp
+--select distinct (AgeGrp)  from [EAT_Reporting_BSOL].[OF].[Demographic]
+--order by AgeGrp
 
 /**********************************************************************************************************/
 
@@ -185,24 +162,36 @@ left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((cr.IMD=d.IMD) or (cr.IM
 													and ((cr.EthnicityCode=d.Ethnicity) or (cr.EthnicityCode is null and d.Ethnicity is null))
 													and cr.Gender=d.Gender
 													and cr.AgeGroup=d.AgeGrp
+--where IndicatorID=20
+--where --ethnicityCode is not null
+-- AgeGroup='5-17 yrs'
+
+--select count(*) from Working.[dbo].[BSOL_0033_OF_Crude_Rates_Predefined_Denominators]  --32076
+
+--select count(*) from #cr_denom
 
 
---where AggregationID is null
---order by AggregationID
---select top 10* from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_CrudeRate] --38340
-
---select * from  Working.[dbo].[BSOL_0033_OF_Crude_Rates]
---where IMD is null and EthnicityCode is null and Gender is null and AgeGroup is null
---where AggregationLabel is null
+--select distinct IndicatorID
+--from #cr_denom
+--where DemographicID is null
+--order by IndicatorID
 
 drop table if exists  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
 select * 
 into EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
 from #cr_denom
 
-select distinct IndicatorID
-from  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
-order by IndicatorID
+--select * 
+-- from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
+-- where IndicatorID=16
+--select distinct IndicatorID
+--from  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
+--order by IndicatorID
+
+
+--select * from 
+--[EAT_Reporting_BSOL].[OF].[Demographic]
+--where AgeGrp='50-70 yrs'
 
 --drop table if exists EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_22401_Falls_CrudeRate]
 --select * 
@@ -329,3 +318,15 @@ order by IndicatorID
 --  from #Group1
 --  group by Financial_Year,LSOA_2021 
 --  order by Financial_Year,LSOA_2021
+
+--SELECT	distinct IndicatorID
+ 
+--FROM	[EAT_Reporting_BSOL].[OF].[IndicatorDataPredefinedDenominator]
+--where	GP_Practice ='M88006'
+--order by IndicatorID
+
+--SELECT top 1000 * --	Distinct IndicatorID
+--FROM	[EAT_Reporting_BSOL].[OF].[IndicatorData]
+--WHERE	GP_Practice ='M88006'
+--Order by IndicatorID
+

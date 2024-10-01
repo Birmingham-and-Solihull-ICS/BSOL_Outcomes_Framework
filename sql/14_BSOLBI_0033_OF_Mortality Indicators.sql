@@ -494,9 +494,10 @@
 		,SUM(1)					   as Numerator
 	INTO #91167_Dataset
     FROM #Unpivotted_Dataset T1
-   INNER JOIN [EAT_Reporting_BSOL].[Development].[BSOL_1252_SUS_LTC_ICD10] T2
+  /* INNER JOIN [EAT_Reporting_BSOL].[Development].[BSOL_1252_SUS_LTC_ICD10] T2
       ON T1.ICD_CODE = T2.ICD10_Code
-   WHERE T2.LTC_Condition = 'Stroke'
+   WHERE T2.LTC_Condition = 'Stroke' */
+   WHERE ICD_CODE LIKE 'I6%'
    GROUP BY 
          CONVERT(VARCHAR(6),REG_DATE,112) 
 		,Ethnicity_Code
@@ -547,9 +548,18 @@
    INNER JOIN [EAT_Reporting_BSOL].[OF].[IndicatorList] T2
       ON T1.ReferenceID = T2.ReferenceID
 
-
-  SELECT TOP 1000 *
-    FROM #91167_Dataset
+/*
+SELECT CalendarYear
+      ,LAD_Name
+	  ,SUM(Numerator)
+    FROM #91167_Dataset T1
+    INNER JOIN [EAT_Reporting_BSOL].[Reference].[vwYear_Month] T2
+      ON T1.TimePeriod = T2.YYYYMM
+	WHERE LAD_Name = 'Solihull'
+  GROUP BY CalendarYear
+      ,LAD_Name
+  order by 1,2
+*/
 
   -- Insert Data
 /*
