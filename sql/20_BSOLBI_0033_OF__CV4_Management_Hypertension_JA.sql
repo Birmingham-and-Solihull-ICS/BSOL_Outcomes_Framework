@@ -23,7 +23,7 @@ select i.[TimePeriodName] as TimePeriod
 into #Dataset
 from [EAT_Reporting_BSOL].[Development].[BSOL_1255_CVDP_Data] i
 inner join EAT_Reporting_BSOL.Reference.BSOL_ICS_PracticeMapped T3		ON		i.[AreaCode]= T3.GPPracticeCode_Original--BSOL Registered
-where IndicatorCode='CVDP007HYP' 
+where IndicatorCode='CVDP007HYP' and TimePeriodName like '%March%'
 --and Sex='Persons' 
 and T3.ICS_2223 = 'BSOL'
 and AreaType='Practice'

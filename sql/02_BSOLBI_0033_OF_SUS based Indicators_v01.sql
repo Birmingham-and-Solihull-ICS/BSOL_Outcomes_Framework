@@ -116,28 +116,34 @@ GROUP BY		T1.EpisodeId
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+DROP TABLE IF EXISTS #combined_output
+ 
+SELECT		T1.*
+,			ROW_NUMBER() OVER(PARTITION BY t1.episodeID ORDER BY t1.episodeID) AS Dedup
+,			T2.DiagnosisCode AS Secondary_Diagnosis
+ 
+INTO		#combined_output
+ 
+FROM		#BSOLBI_0033_OF_22401_EM_Falls_65andOver T1
+INNER JOIN	EAT_Reporting.dbo.tbIpDiagnosisRelational T2
+ON			T1.EpisodeId = T2.EpisodeId
+WHERE		1=1
+AND			LEFT(T2.DiagnosisCode,2) IN ('W0','W1')				--with a Secondary Diagnosis of W00 to W19
+ 
+DELETE FROM #combined_output WHERE Dedup <> 1
+
 INSERT INTO		#BSOL_OF_tbStaging_NumeratorData
 (				ReferenceID
 ,				EpisodeID
 ,				Numerator
 )
-
-( 
-SELECT			T1.ReferenceID
-,				T1.EpisodeID
-,				SUM (1)							[Numerator]			
-
-FROM			#BSOLBI_0033_OF_22401_EM_Falls_65andOver T1
-
-INNER JOIN		EAT_Reporting.dbo.tbIpDiagnosisRelational T2
-ON				T1.EpisodeId = T2.EpisodeId
-
-WHERE			1=1
-AND				LEFT(T2.DiagnosisCode,1) IN ('W')				--with a Secondary Diagnosis of W00 to W19
-
-GROUP BY		T1.ReferenceID
-,				T1.EpisodeID
-
+(
+SELECT ReferenceID
+      ,EpisodeID
+	  ,SUM(1) as Numerator
+FROM #combined_output
+GROUP BY ReferenceID
+      ,EpisodeID
 )
 
 
@@ -399,7 +405,7 @@ AND				T2.DiagnosisCode IN (	select	ICD10Code
 										where	left(ICD10Code,1) ='J'					--respiratory disease
 										group by ICD10Code
 									)
-AND				T2.DiagnosisOrder = 1													--Primary Diagnosis position
+--AND				T2.DiagnosisOrder = 1													--Primary Diagnosis position
 
 GROUP BY		T1.EpisodeId
 
@@ -441,11 +447,11 @@ AND				LEFT(T3.AdmissionMethodCode,1) = 2										--Emergency Admissions
 AND				T3.OrderInSpell =1														--First Episode in Spell
 AND				T2.DiagnosisCode IN (	select	ICD10Code
 										from	Reference.dbo.DIM_tbICD10
-										where	LEFT(DiagnosisCode,3) LIKE 'J4[01234]'	--COPD
+										where	LEFT(ICD10Code,3) LIKE 'J4[01234]'	--COPD
 										group by ICD10Code
 									)
 AND				T3.AgeOnAdmission >= 35                                                 --Age 35+
-
+AND             T2.DiagnosisOrder = 1													--Primary Diagnosis position
 
 GROUP BY		T1.EpisodeId
 
@@ -490,11 +496,12 @@ AND				LEFT(T3.AdmissionMethodCode,1) = 2										--Emergency Admissions
 AND				T3.OrderInSpell =1														--First Episode in Spell
 AND				T2.DiagnosisCode IN (	select	ICD10Code
 										from	Reference.dbo.DIM_tbICD10
-										where	LEFT(DiagnosisCode,3) LIKE 'J4[56]'		--Asthma or Status asthmaticus
+										where	LEFT(ICD10Code,3) LIKE 'J4[56]'		--Asthma or Status asthmaticus
 										group by ICD10Code
 									)
 
 AND				T3.AgeOnAdmission < 19                                                 --Age <19
+AND             T2.DiagnosisOrder = 1													--Primary Diagnosis position
 
 
 GROUP BY		T1.EpisodeId
@@ -974,11 +981,10 @@ INNER JOIN	[EAT_Reporting_BSOL].[OF].[IndicatorList] T2
 ON			T1.[ReferenceID] = T2.[ReferenceID]
 
 
-
 /*==================================================================================================================================================================
 INSERT FINAL Numerator Date into [EAT_Reporting_BSOL].[OF].[IndicatorData]
 =================================================================================================================================================================*/
---select top 1000 * from #BSOL_OF_tbStaging_NumeratorData
+--select  * from #BSOL_OF_tbStaging_NumeratorData
 
 
 --INSERT INTO		[EAT_Reporting_BSOL].[OF].[IndicatorData] 

@@ -145,17 +145,17 @@ DROP TABLE IF EXISTS #22_staging
 
 into #22_staging
 FROM		##OF_LiveBirths as LB
---Full outer join here as possible to have 0 births and >=1 death in LSOA/ethicity group in 1 year, due to the way this indicator is calculated
-full outer join ##OF_InfantDeaths AS ID
+
+left join ##OF_InfantDeaths AS ID
 on				LB.[LSOA2011]=ID.[LSOA2011]
 AND				LB.[TimePeriod]=ID.[TimePeriod]
 AND				LB.[Ethnicity_Code]=ID.[Ethnicity_Code] 
 
 LEFT JOIN		[EAT_Reporting_BSOL].[Reference].[LSOA_2011_to_LSOA_2021] LSOA2011to2022 
 				ON LB.LSOA2011 = LSOA2011to2022.[LSOA11CD]
---20240927 change from join on LAD to on LSOA21
+
 left join      [EAT_Reporting_BSOL].[Reference].[LSOA_2021_WARD_LAD] wd
-			   ON wd.LSOA21CD = LSOA2011to2022.LSOA21CD
+			   ON wd.LAD22CD = LSOA2011to2022.LAD22CD
 
 left join	   [EAT_Reporting_BSOL].[Reference].[LSOA_2021_BSOL_to_Constituency_2025_Locality] lk
 				on wd.LSOA21CD = lk.LSOA21CD
@@ -174,8 +174,7 @@ Select
 		sum(Denominator) as Denominator,
 		dtt.FinYear,
 		a.ward_code as agregation_code,
-		a.Ethnicity,
-		'<1 yr (including <28 days)' as AgeGrp
+		a.Ethnicity
 
 into #22_working
 FROM 
@@ -195,8 +194,7 @@ Select
 		sum(Denominator) as Denominator,
 		dtt.FinYear,
 		lcl.AggregationCode as Locality,
-		a.Ethnicity,
-		'<1 yr (including <28 days)' as AgeGrp
+		a.Ethnicity
 FROM 
 		(Select * 
 		, convert(datetime, TimePeriod + '01', 112) AS dt
@@ -214,8 +212,7 @@ Select
 		sum(Denominator) as Denominator,
 		dtt.FinYear,
 		a.LA_code,
-		a.Ethnicity,
-		'<1 yr (including <28 days)' as AgeGrp
+		a.Ethnicity
 FROM 
 		(Select * 
 		, convert(datetime, TimePeriod + '01', 112) AS dt
@@ -232,9 +229,7 @@ Select
 		sum(Denominator) as Denominator,
 		dtt.FinYear,
 		'E38000258',
-		a.Ethnicity,
-		'<1 yr (including <28 days)' as AgeGrp
-
+		a.Ethnicity
 FROM 
 		(Select * 
 		, convert(datetime, TimePeriod + '01', 112) AS dt
@@ -245,85 +240,6 @@ Where	a.Locality is not null
 group by dtt.FinYear,
 		--a.ward_code,
 		a.Ethnicity		
-
--- Repeat without ethnicity groups
-Insert into #22_working
-
-Select 
-		sum(Numerator) as Numerator,
-		sum(Denominator) as Denominator,
-		dtt.FinYear,
-		a.ward_code as agregation_code,
-		NULL as Ethnicity,
-		'<1 yr (including <28 days)' as AgeGrp
-
---into #22_working
-FROM 
-		(Select * 
-		, convert(datetime, TimePeriod + '01', 112) AS dt
-		from #22_staging) a
-		inner join reference.[dbo].[DIM_tbDate] dtt ON a.dt = dtt.[Date]
-Where	a.Locality is not null
-group by dtt.FinYear,
-		a.ward_code
-		--a.Ethnicity
-
-UNION ALL 
--- Locality
-Select 
-		sum(Numerator) as Numerator,
-		sum(Denominator) as Denominator,
-		dtt.FinYear,
-		lcl.AggregationCode as Locality,
-		NULL as Ethnicity,
-		'<1 yr (including <28 days)' as AgeGrp
-FROM 
-		(Select * 
-		, convert(datetime, TimePeriod + '01', 112) AS dt
-		from #22_staging) a
-		inner join reference.[dbo].[DIM_tbDate] dtt ON a.dt = dtt.[Date]
-		inner join (Select * FROM [OF].[Aggregation] Where AggregationType = 'Locality (resident)') lcl ON a.Locality = lcl.AggregationLabel
-Where	a.Locality is not null
-group by dtt.FinYear,
-		lcl.AggregationCode
-		--1a.Ethnicity
-UNION ALL 
--- LA
-Select 
-		sum(Numerator) as Numerator,
-		sum(Denominator) as Denominator,
-		dtt.FinYear,
-		a.LA_code,
-		NULL as Ethnicity,
-		'<1 yr (including <28 days)' as AgeGrp
-FROM 
-		(Select * 
-		, convert(datetime, TimePeriod + '01', 112) AS dt
-		from #22_staging) a
-		inner join reference.[dbo].[DIM_tbDate] dtt ON a.dt = dtt.[Date]
-Where	a.Locality is not null
-group by dtt.FinYear,
-		a.LA_code
-		--a.Ethnicity
-UNION ALL 
--- BSOL
-Select 
-		sum(Numerator) as Numerator,
-		sum(Denominator) as Denominator,
-		dtt.FinYear,
-		'E38000258',
-		NULL as Ethnicity,
-		'<1 yr (including <28 days)' as AgeGrp
-FROM 
-		(Select * 
-		, convert(datetime, TimePeriod + '01', 112) AS dt
-		from #22_staging) a
-		inner join reference.[dbo].[DIM_tbDate] dtt ON a.dt = dtt.[Date]
-
-Where	a.Locality is not null
-group by dtt.FinYear
-		--a.ward_code,
-		--a.Ethnicity		
 
 
 Delete from [OF].[IndicatorValue]
@@ -359,32 +275,7 @@ Select 22 as IndicatorID
 
 from #22_working a
 left join  [OF].Aggregation b on a.agregation_code = b.AggregationCode
-left join  [OF].Demographic c on a.Ethnicity = c.Ethnicity and a.AgeGrp = c.AgeGrp and c.IMD is NULL and c.Gender = 'Persons'
-WHERE a.Ethnicity is not null
-
-UNION ALL 
-
-Select 22 as IndicatorID
-, getdate()
-, coalesce(Numerator,0) as Numerator
-, case when coalesce(Denominator,0) = 0 THEN 1 ELSE Denominator END as Denominator
-, 1000 * (cast(coalesce(Numerator,0) as float) / cast((case when coalesce(Denominator,0) = 0 THEN 1 ELSE Denominator END)as float)) as IndicatorValue
-, 1000 * ([OF].byars_lower_95(Numerator) / cast(denominator as float)) as LowerCI95
-, 1000 * ([OF].byars_upper_95(Numerator) / cast(denominator as float)) as UpperCI95
-, b.AggregationID
-, c.DemographicID
-, 1 as DataQualityID
-, convert(datetime, CONCAT('20', substring(FinYear,1,2), '0401'), 112) as IndicatorStartDate
-, convert(datetime, CONCAT('20', substring(FinYear,3,2), '0331'), 112) as IndicatorEndDate
---, FinYear
-
-from #22_working a
-left join  [OF].Aggregation b on a.agregation_code = b.AggregationCode
-left join  [OF].Demographic c on c.Ethnicity is NULL and a.AgeGrp = c.AgeGrp and c.IMD is NULL and c.Gender = 'Persons'
-WHERE a.Ethnicity is null
-
-
-
+left join  [OF].Demographic c on a.Ethnicity = c.Ethnicity and c.AgeGrp = '<1 yr (including <28 days)' and c.IMD is NULL and c.Gender = 'Persons'
 
 
 
@@ -433,7 +324,6 @@ SELECT			33													As [IndicatorID]
 ,				lk.Locality											as Locality -- added by CM
 into #33_staging
 FROM			##OF_LiveBirths as LB
---Full outer join here as possible to have 0 births and >=1 death in LSOA/ethicity group in 1 year, due to the way this indicator is calculated
 FULL OUTER JOIN ##OF_NeonatalDeaths AS ND
 on				LB.[LSOA2011]=ND.[LSOA2011]
 AND				LB.[TimePeriod]=ND.[TimePeriod]
@@ -445,9 +335,9 @@ AND				LB.[Ethnicity_Code]=ND.[Ethnicity_Code]
 
 LEFT JOIN		[EAT_Reporting_BSOL].[Reference].[LSOA_2011_to_LSOA_2021] LSOA2011to2022 
 				ON LB.LSOA2011 = LSOA2011to2022.[LSOA11CD]
---20240927 change from join on LAD to on LSOA21
+
 left join      [EAT_Reporting_BSOL].[Reference].[LSOA_2021_WARD_LAD] wd
-			   ON wd.LSOA21CD = LSOA2011to2022.LSOA21CD
+			   ON wd.LAD22CD = LSOA2011to2022.LAD22CD
 
 left join	   [EAT_Reporting_BSOL].[Reference].[LSOA_2021_BSOL_to_Constituency_2025_Locality] lk
 				on wd.LSOA21CD = lk.LSOA21CD
@@ -464,8 +354,7 @@ Select
 		sum(Denominator) as Denominator,
 		dtt.FinYear,
 		a.ward_code as agregation_code,
-		a.Ethnicity,
-		'<28 days' as AgeGrp
+		a.Ethnicity
 
 into #33_working
 FROM 
@@ -484,8 +373,7 @@ Select
 		sum(Denominator) as Denominator,
 		dtt.FinYear,
 		lcl.AggregationCode,
-		a.Ethnicity,
-		'<28 days' as AgeGrp
+		a.Ethnicity
 FROM 
 		(Select * 
 		, convert(datetime, TimePeriod + '01', 112) AS dt
@@ -503,8 +391,7 @@ Select
 		sum(Denominator) as Denominator,
 		dtt.FinYear,
 		a.LA_code,
-		a.Ethnicity,
-		'<28 days' as AgeGrp
+		a.Ethnicity
 FROM 
 		(Select * 
 		, convert(datetime, TimePeriod + '01', 112) AS dt
@@ -521,8 +408,7 @@ Select
 		sum(Denominator) as Denominator,
 		dtt.FinYear,
 		'E38000258',
-		a.Ethnicity,
-		'<28 days' as AgeGrp
+		a.Ethnicity
 FROM 
 		(Select * 
 		, convert(datetime, TimePeriod + '01', 112) AS dt
@@ -533,86 +419,7 @@ group by dtt.FinYear,
 		--a.ward_code,
 		a.Ethnicity		
 
-INsert into #33_working
-Select 
-		sum(Numerator) as Numerator,
-		sum(Denominator) as Denominator,
-		dtt.FinYear,
-		a.ward_code as agregation_code,
-		NULL as Ethnicity,
-		'<28 days' as AgeGrp
 
---into #33_working
-FROM 
-		(Select * 
-		, convert(datetime, TimePeriod + '01', 112) AS dt
-		from #33_staging) a
-		inner join reference.[dbo].[DIM_tbDate] dtt ON a.dt = dtt.[Date]
-Where	a.Locality is not null
-group by dtt.FinYear,
-		a.ward_code
-		--a.Ethnicity
-UNION ALL 
--- Locality
-Select 
-		sum(Numerator) as Numerator,
-		sum(Denominator) as Denominator,
-		dtt.FinYear,
-		lcl.AggregationCode,
-		NULL as Ethnicity,
-		'<28 days' as AgeGrp
-FROM 
-		(Select * 
-		, convert(datetime, TimePeriod + '01', 112) AS dt
-		from #33_staging) a
-		inner join reference.[dbo].[DIM_tbDate] dtt ON a.dt = dtt.[Date]
-		inner join (Select * FROM [OF].[Aggregation] Where AggregationType = 'Locality (resident)') lcl ON a.Locality = lcl.AggregationLabel
-Where	a.Locality is not null
-group by dtt.FinYear,
-		lcl.AggregationCode
-		--a.Ethnicity
-UNION ALL 
--- LA
-Select 
-		sum(Numerator) as Numerator,
-		sum(Denominator) as Denominator,
-		dtt.FinYear,
-		a.LA_code,
-		NULL as Ethnicity,
-		'<28 days' as AgeGrp
-FROM 
-		(Select * 
-		, convert(datetime, TimePeriod + '01', 112) AS dt
-		from #33_staging) a
-		inner join reference.[dbo].[DIM_tbDate] dtt ON a.dt = dtt.[Date]
-Where	a.Locality is not null
-group by dtt.FinYear,
-		a.LA_code
-		--a.Ethnicity
-UNION ALL 
--- BSOL
-Select 
-		sum(Numerator) as Numerator,
-		sum(Denominator) as Denominator,
-		dtt.FinYear,
-		'E38000258',
-		NULL as Ethnicity,
-		'<28 days' as AgeGrp
-FROM 
-		(Select * 
-		, convert(datetime, TimePeriod + '01', 112) AS dt
-		from #33_staging) a
-		inner join reference.[dbo].[DIM_tbDate] dtt ON a.dt = dtt.[Date]
-Where	a.Locality is not null
-group by dtt.FinYear
-		--a.ward_code,
-		--a.Ethnicity		
-
-
-
--- Delte from output
-Delete from [OF].[IndicatorValue]
-Where IndicatorID = 33
 
 -- Wrap into output format
 INSERT INTO [OF].[IndicatorValue]
@@ -644,28 +451,4 @@ Select 33 as IndicatorID
 
 from #33_working a
 left join  [OF].Aggregation b on a.agregation_code = b.AggregationCode
-left join  [OF].Demographic c on a.Ethnicity = c.Ethnicity and a.AgeGrp = c.AgeGrp and c.IMD is NULL and c.Gender = 'Persons'
-WHERE a.Ethnicity is not null
-
-UNION ALL
-
-Select 33 as IndicatorID
-, getdate()
-, coalesce(Numerator,0) as Numerator
-, case when coalesce(Denominator,0) = 0 THEN 1 ELSE Denominator END as Denominator
-, 1000 * (cast(coalesce(Numerator,0) as float) / cast((case when coalesce(Denominator,0) = 0 THEN 1 ELSE Denominator END)as float)) as IndicatorValue
-, 1000 * ([OF].byars_lower_95(Numerator) / cast(denominator as float)) as LowerCI95
-, 1000 * ([OF].byars_upper_95(Numerator) / cast(denominator as float)) as UpperCI95
-, b.AggregationID
-, c.DemographicID
-, 1 as DataQualityID
-, convert(datetime, CONCAT('20', substring(FinYear,1,2), '0401'), 112) as IndicatorStartDate
-, convert(datetime, CONCAT('20', substring(FinYear,3,2), '0331'), 112) as IndicatorEndDate
---, FinYear
-
-from #33_working a
-left join  [OF].Aggregation b on a.agregation_code = b.AggregationCode
-left join  [OF].Demographic c on c.Ethnicity is NULL and a.AgeGrp = c.AgeGrp and c.IMD is NULL and c.Gender = 'Persons'
-WHERE a.Ethnicity is null
-
-
+left join  [OF].Demographic c on a.Ethnicity = c.Ethnicity and c.AgeGrp = '<28 days' and c.IMD is NULL and c.Gender = 'Persons'
