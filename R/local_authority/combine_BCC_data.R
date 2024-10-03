@@ -21,9 +21,9 @@ for (i in 1:length(dfs)) {
     dfs[[i]] <- dfs[[i]] %>%
       mutate(
         IndicatorValue = 1000 * Numerator / Denominator,
-        a_prime = Numerator + 0.5,
+        a_prime = Numerator + 1,
         Z = qnorm(0.975),
-        LowerCI95 = 1000 * a_prime * (1 - 1/(9*a_prime) - Z/3 * sqrt(1/a_prime))**3/Denominator,
+        LowerCI95 = 1000 * Numerator * (1 - 1/(9*Numerator) - Z/3 * sqrt(1/Numerator))**3/Denominator,
         UpperCI95 = 1000 * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator,
         DemographicID = case_when(
           DemographicID == "Male" ~ 3,
@@ -36,7 +36,7 @@ for (i in 1:length(dfs)) {
           TRUE ~ NA
         ),
         DataQualityID = 1,
-        InsertDate = "2024-04-30"
+        InsertDate = as.Date("30/04/2024", format  = "%d/%m/%Y") 
       ) %>%
       select(-c(a_prime, Z))
   }
@@ -46,8 +46,18 @@ for (i in 1:length(dfs)) {
     mutate(
       # Standardise insert date formats
       InsertDate = case_when(
-        grepl("\\d{2}/\\d{2}/\\d{4}", InsertDate) ~ as.Date(InsertDate, fmt = "%d/%m/%Y"),
-        grepl("\\d{4}-\\d{2}-\\d{2}", InsertDate) ~ as.Date(InsertDate),
+        grepl("\\d{2}/\\d{2}/\\d{4}", InsertDate) ~ as.Date(InsertDate, format  = "%d/%m/%Y"),
+        grepl("\\d{4}-\\d{2}-\\d{2}", InsertDate) ~ as.Date(InsertDate, format  = "%Y-%m-%d"),
+        TRUE ~ NA
+      ),
+      IndicatorStartDate = case_when(
+        grepl("\\d{2}/\\d{2}/\\d{4}", IndicatorStartDate) ~ as.Date(IndicatorStartDate, format  = "%d/%m/%Y"),
+        grepl("\\d{4}-\\d{2}-\\d{2}", IndicatorStartDate) ~ as.Date(IndicatorStartDate, format  = "%Y-%m-%d"),
+        TRUE ~ NA
+      ),
+      IndicatorEndDate = case_when(
+        grepl("\\d{2}/\\d{2}/\\d{4}", IndicatorEndDate) ~ as.Date(IndicatorEndDate, format  = "%d/%m/%Y"),
+        grepl("\\d{4}-\\d{2}-\\d{2}", IndicatorEndDate) ~ as.Date(IndicatorEndDate, format  = "%Y-%m-%d"),
         TRUE ~ NA
       )
       ) %>%
@@ -56,12 +66,35 @@ for (i in 1:length(dfs)) {
              "DemographicID", "DataQualityID", "IndicatorStartDate", "IndicatorEndDate" ))
   
 }
-
+bind_rows(dfs)
 # Combine dfs
-OF_values <- bind_rows(dfs)
+OF_values <- bind_rows(dfs) %>%
+  # Work around the Byar's 0 count problem
+  mutate(
+    LowerCI95 = case_when(
+      is.na(LowerCI95) ~ 0,
+      TRUE ~ LowerCI95
+    )
+  )
 # Remove any value IDs
 OF_values$ValueID = NA
 
+
+#################################################################
+###                Solihull as a Locality                     ###
+#################################################################
+
+solihull_as_LA <- OF_values %>%
+  filter(
+    IndicatorID %in% c(8,9) &
+      AggregationID == 146
+  ) %>%
+  mutate(
+    AggregationID = 134
+  )
+
+OF_values <- rbind(OF_values, solihull_as_LA) %>%
+  arrange(IndicatorID)
 
 #################################################################
 ###                   Combine meta Data                       ###
@@ -129,8 +162,8 @@ if ((any(OF_values$LowerCI95 > OF_values$IndicatorValue))) {
 } 
 
 # Check that dates make sense
-if (min(OF_values$IndicatorStartDate) < as.Date("01/01/2000")) {
-  stop("Minimum date out before 01/01/2020.")
+if (min(OF_values$IndicatorStartDate) < as.Date("01/01/1997",format = "%d/%m/%Y")) {
+  stop("Minimum date out before 01/01/1997.")
 } else if (max(OF_values$IndicatorStartDate) > Sys.Date()) {
   stop("Maximum dates is in the future.")
 }
@@ -150,6 +183,32 @@ if (length(missing_definition) > 0) {
     sprintf("Definition missing for IndicatorIDs: %s", list(missing_definition))
   )
 }
+
+# Find any outliers
+outlier_checks <- OF_values %>%
+  group_by(IndicatorID) %>%
+  summarise(
+    median = mean(IndicatorValue),
+    iqr = IQR(IndicatorValue),
+    Q3 = quantile(IndicatorValue, 0.75),
+    Q1 = quantile(IndicatorValue, 0.25),
+    nvals = n(),
+    min = min(IndicatorValue),
+    max = max(IndicatorValue),
+    outliers = sum(
+      IndicatorValue < Q1 - 1.5*iqr |
+        IndicatorValue > Q3 + 1.5*iqr   
+    )
+  ) %>%
+  select(
+    -c(Q1, Q3)
+  ) %>%
+  filter(
+    outliers > 0
+  )
+
+cat("\nPotential outlier check:\n")
+print(outlier_checks)
 
 #################################################################
 ###                      Save Data                            ###
@@ -176,3 +235,4 @@ write_csv(OF_meta,
           meta_save_name)
 
 
+print("Done.")
