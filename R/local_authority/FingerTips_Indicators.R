@@ -209,17 +209,49 @@ process_GP_data <- function(FingerTips_id) {
     ) %>%
     mutate(
       magnitude = get_magnitude(meta),
-      CI_method = get_CI_method(meta)
+      CI_method = get_CI_method(meta),
+      missing = is.na(Count) | is.na(Denominator)
+    ) 
+  
+  GP_data  <- data %>%
+    inner_join(
+      GP_lookup, 
+      join_by(AreaCode == "Practice_Code")
     )
+  
+  # Check for any missing values and print percentage missing before these 
+  # rows are removed
+  missing_check <- GP_data %>%
+    group_by(
+      Timeperiod
+    ) %>%
+    summarise(
+      num_missing = sum(missing),
+      perc_missing = round(100*num_missing/n(), 2)
+    )  %>%
+    filter(
+      num_missing > 0
+    )
+  
+  # Report any missing data
+  if (nrow(missing_check) > 0) {
+    print(
+      paste("Missing GP data for FT ID:", FingerTips_id)
+      )
+    print(missing_check)
+  }
+  
   
   # England data
   df_eng <- data %>% 
     filter(AreaCode == "E92000001")
   
   # Aggregate for PCNs
-  df_PCN <- data %>%
-    inner_join(GP_lookup, 
-               join_by(AreaCode == "Practice_Code")) %>%
+  df_PCN <- GP_data %>%
+    # Remove rows with missing Numerator or Denominator
+    filter(
+      !missing
+    )  %>%
     group_by(PCN_Code, Timeperiod,  Sex, Age, magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
@@ -244,7 +276,7 @@ process_GP_data <- function(FingerTips_id) {
       )
     ) %>% 
     ungroup() 
-      
+  
   # Aggregate for Localities
   df_Locality <- df_PCN %>%
     inner_join(PCN_lookup, 
@@ -564,6 +596,22 @@ output_meta <- collected_meta %>%
     ),
     # Update LARC caveats text
     Caveats = case_when(
+      IndicatorID == 15 ~ paste(
+        "Solihull data not available for some years due to small numbers.", 
+        Caveats
+      ),
+      IndicatorID == 17 ~ paste(
+        "One GP in 2012/13 missing due to missing source data. This GP has therefore been omitted from the 2012/13 value calculation.", 
+        Caveats
+      ),
+      IndicatorID == 20 ~ paste(
+        "Data for between 1 (0.55%) and 14 (7.7%) of GPs missing each year from 2009/10 to 2021/22 except 2015/16. These GPs have therefore been omitted from the 2012/13 value calculation.", 
+        Caveats
+      ),
+      IndicatorID == 34 ~ paste(
+        "Source data not available for 1 GP (0.55%) in 2019/20 and 2020/21. This GP has therefore been omitted from the 2012/13 value calculation for these years.", 
+        Caveats
+      ),
       IndicatorID == 130 ~ paste(
         "Solihull data currently unavailable.", 
         Caveats
