@@ -404,7 +404,9 @@ process_Eng_data <- function(FingerTips_id) {
     select(
       AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
       LowerCI95, UpperCI95
-    )
+    ) %>%
+    distinct()
+  
   
   output <- list(
     "data" = data,
