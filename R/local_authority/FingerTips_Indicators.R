@@ -614,12 +614,16 @@ output_meta <- collected_meta %>%
         "Data for between 1 (0.55%) and 14 (7.7%) of GPs missing each year from 2009/10 to 2021/22 except 2015/16. These GPs have therefore been omitted from the 2012/13 value calculation.", 
         Caveats
       ),
+      IndicatorID == 27 ~ paste(
+        "Birmingham values from 2016/17 to 23/24 and Solihul value for 2016/17 not published due to data quality reasons.", 
+        Caveats
+      ),
       IndicatorID == 34 ~ paste(
         "Source data not available for 1 GP (0.55%) in 2019/20 and 2020/21. This GP has therefore been omitted from the 2012/13 value calculation for these years.", 
         Caveats
       ),
-      IndicatorID == 34 ~ paste(
-        "Birmingham values from 2016/17 to 23/24 and Solihul value for 2016/17 not published due to data quality reasons.", 
+      IndicatorID == 57 ~ paste(
+        "Solihull value not published in 2019/20 due for data quality reasons.", 
         Caveats
       ),
       IndicatorID == 130 ~ paste(
