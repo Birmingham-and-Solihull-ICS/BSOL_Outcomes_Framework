@@ -119,7 +119,10 @@ OF_meta$MetaValue <- gsub("<.*?>", "", OF_meta$MetaValue)
 #################################################################
 
 # look at level of missing data
-missing_data_check <- OF_values %>% summarise(across(everything(), ~ sum(is.na(.))))
+missing_data_check <- OF_values %>% 
+  summarise(
+    across(everything(), ~ sum(is.na(.)))
+    )
 cat("Value missing data check:\n")
 print(missing_data_check)
 
@@ -154,7 +157,7 @@ if (!(ID_match_check1 & ID_match_check2)) {
   print(value_IndicatorIDs)
 }
 
-# check sense check on confidence intervals
+# Sense check on confidence intervals
 if ((any(OF_values$LowerCI95 > OF_values$IndicatorValue))) {
   stop("One or more LowerCI95 > IndicatorValue")
 } else if ((any(OF_values$UpperCI95 < OF_values$IndicatorValue))) {
@@ -167,6 +170,46 @@ if (min(OF_values$IndicatorStartDate) < as.Date("01/01/1997",format = "%d/%m/%Y"
 } else if (max(OF_values$IndicatorStartDate) > Sys.Date()) {
   stop("Maximum dates is in the future.")
 }
+
+# Check geographies available for each indicator
+aggregation_types <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Aggregation"
+) %>%
+  mutate(
+    AggregationType = case_when(
+      AggregationID == 146 ~ "LA-Solihull",
+      AggregationID == 147 ~ "LA-Birmingham",
+      TRUE ~ AggregationType
+    )
+  ) %>%
+  select(
+    AggregationID, 
+    AggregationType
+  )
+
+geography_check <- OF_values %>%
+  left_join(
+    aggregation_types,
+    by = join_by(AggregationID)
+  ) %>%
+  count(IndicatorID, AggregationType) %>%
+  tidyr::pivot_wider(
+    id_cols = IndicatorID,
+    names_from = AggregationType,
+    values_from = n
+  ) %>%
+  select(
+    IndicatorID, PCN, `Locality (registered)`, 
+    Ward, `Constituency`,`Locality (resident)`,
+    `LA-Solihull`, `LA-Birmingham`, ICB, England
+  )
+write.csv(
+  geography_check,
+  "../../data/LA-indicator-geog-checks.csv",
+  row.names = FALSE,
+  na = ""
+  )
 
 # Check that each indicator has a definition 
 missing_definition <- OF_meta %>%
