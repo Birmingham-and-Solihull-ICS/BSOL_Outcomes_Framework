@@ -39,6 +39,51 @@ for (i in 1:length(dfs)) {
         InsertDate = as.Date("30/04/2024", format  = "%d/%m/%Y") 
       ) %>%
       select(-c(a_prime, Z))
+   }
+  
+  # Recalculate ICB values for child overweight indicators
+  if (id_i[[1]] == 8 | id_i[[1]] == 9) {
+    # remove current ICB data
+    dfs[[i]] <- dfs[[i]] %>%
+      filter(
+        AggregationID != 148
+      )
+    
+    # Calculate ICB values
+    df_ICB <- dfs[[i]] %>%
+      filter(
+        # Filter for Birmingham and Solihull values
+        AggregationID %in% c(146, 147)
+      ) %>%
+      group_by(
+        IndicatorID, IndicatorStartDate, 
+        IndicatorEndDate, InsertDate 
+      ) %>%
+      summarise(
+        Numerator = sum(Numerator),
+        Denominator = sum(Denominator)
+      ) %>%
+      mutate(
+        ValueID = NA,
+        p = Numerator / Denominator,
+        IndicatorValue = 100 * p,
+        Z = qnorm(0.975),
+        LowerCI95 =  100 * (p + Z^2/(2*Denominator) - Z * sqrt((p*(1-p)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+        UpperCI95 = 100 * (p + Z^2/(2*Denominator) + Z * sqrt((p*(1-p)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+        AggregationID = 148,
+        DemographicID = 28,
+        DataQualityID = 1
+      ) %>%
+      select(
+        ValueID, IndicatorID, InsertDate, Numerator, Denominator,
+        IndicatorValue, LowerCI95, UpperCI95, AggregationID,
+        DemographicID,DataQualityID,IndicatorStartDate,IndicatorEndDate
+      )
+   # Append ICB values
+    dfs[[i]] <- rbind(dfs[[i]], df_ICB) %>%
+      arrange(
+        AggregationID, IndicatorStartDate
+      )
   }
   
   # select and reorder columns so they match
