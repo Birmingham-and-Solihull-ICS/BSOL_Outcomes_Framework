@@ -432,6 +432,33 @@ demo_table <-
   demo_table %>% 
   bind_rows(append_lt1)
 
+####################################################################################
+
+# Added additional 5yr band for BCC provided data
+
+
+bcc_2_all_gender <- data.frame (
+  AgeGrp = c("5 yrs")
+)
+
+# Age and gender
+bcc_2_age_g <- bcc_2_all_gender %>% 
+  cross_join(gender) 
+
+bcc_append_2 <- 
+    bcc_2_age_g %>% 
+      mutate(
+        DemographicLabel =  paste0(Gender,': ', AgeGrp),
+        Gender = Gender,
+        AgeGrp = AgeGrp,
+        IMD = NA,
+        Ethnicity = NA) %>% 
+      select(DemographicLabel, Gender, AgeGrp, IMD, Ethnicity)
+
+# add into main table
+demo_table <- 
+  demo_table %>% 
+  bind_rows(bcc_append_2)
 
 
 #################################################################################
