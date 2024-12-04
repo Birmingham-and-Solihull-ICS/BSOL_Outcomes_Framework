@@ -2,7 +2,7 @@ library(fingertipsR)
 library(dplyr)
 library(data.table)
 library(readxl)
-
+library(lubridate)
 # Load indicator list
 ids <- read_excel(
   "../../data/LA_FingerTips_Indicators.xlsx",
@@ -130,8 +130,14 @@ process_LA_data <- function(FingerTips_id) {
     ) %>%
     mutate(
       magnitude = get_magnitude(meta),
-      CI_method = get_CI_method(meta)
-    )
+      CI_method = get_CI_method(meta),
+      Count = case_when(
+        !is.na(Count) ~ Count,
+        # If count isn't given but there is Denominator and Value data
+        #  then estimate the count from these
+        !is.na(Denominator) & !is.na(Value) ~ Denominator * Value / magnitude
+      )
+    ) 
   
   # England data
   df_eng <- data %>% 
@@ -209,17 +215,49 @@ process_GP_data <- function(FingerTips_id) {
     ) %>%
     mutate(
       magnitude = get_magnitude(meta),
-      CI_method = get_CI_method(meta)
+      CI_method = get_CI_method(meta),
+      missing = is.na(Count) | is.na(Denominator)
+    ) 
+  
+  GP_data  <- data %>%
+    inner_join(
+      GP_lookup, 
+      join_by(AreaCode == "Practice_Code")
     )
+  
+  # Check for any missing values and print percentage missing before these 
+  # rows are removed
+  missing_check <- GP_data %>%
+    group_by(
+      Timeperiod
+    ) %>%
+    summarise(
+      num_missing = sum(missing),
+      perc_missing = round(100*num_missing/n(), 2)
+    )  %>%
+    filter(
+      num_missing > 0
+    )
+  
+  # Report any missing data
+  if (nrow(missing_check) > 0) {
+    print(
+      paste("Missing GP data for FT ID:", FingerTips_id)
+      )
+    print(missing_check)
+  }
+  
   
   # England data
   df_eng <- data %>% 
     filter(AreaCode == "E92000001")
   
   # Aggregate for PCNs
-  df_PCN <- data %>%
-    inner_join(GP_lookup, 
-               join_by(AreaCode == "Practice_Code")) %>%
+  df_PCN <- GP_data %>%
+    # Remove rows with missing Numerator or Denominator
+    filter(
+      !missing
+    )  %>%
     group_by(PCN_Code, Timeperiod,  Sex, Age, magnitude, CI_method) %>%
     summarise(
       Count = sum(Count),
@@ -244,7 +282,7 @@ process_GP_data <- function(FingerTips_id) {
       )
     ) %>% 
     ungroup() 
-      
+  
   # Aggregate for Localities
   df_Locality <- df_PCN %>%
     inner_join(PCN_lookup, 
@@ -350,6 +388,33 @@ process_GP_data <- function(FingerTips_id) {
   return(output)
 }
 
+process_Eng_data <- function(FingerTips_id) {
+  # Fetch data
+  data_and_meta <- fetch_data(FingerTips_id, AreaTypeID = 15)
+  data <- data_and_meta[["data"]]
+  meta <- data_and_meta[["meta"]]
+  # delete list to save space
+  rm(data_and_meta)
+  
+  data <- data %>%
+    mutate(
+      LowerCI95 = LowerCI95.0limit, 
+      UpperCI95 = UpperCI95.0limit
+    )%>%
+    select(
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
+      LowerCI95, UpperCI95
+    ) %>%
+    distinct()
+  
+  
+  output <- list(
+    "data" = data,
+    "meta" = meta
+  )
+  
+}
+
 ## Data processing functions ##
 
 start_date <- function(date) {
@@ -369,10 +434,26 @@ start_date <- function(date) {
   }
   # if multi year e.g. 2012 - 2014
   else if (grepl("^\\d{4} - \\d{2}$",date)) {
-    Year_Start = stringr::str_extract(date,"^\\d{4}")
+    Year_Start <-  stringr::str_extract(date,"^\\d{4}")
     start_date <- as.Date(
       sprintf("%s/01/01", Year_Start),
       format = "%Y/%m/%d")
+  }
+  # Quarterly data e.g. 2013/14 Q1
+  else if (grepl("^\\d{4}/\\d{2} Q\\d{1}$",date)) {
+    Year_Start <- as.numeric(stringr::str_extract(date,"^\\d{4}"))
+    Quarter <-  as.numeric(stringr::str_extract(date,"\\d{1}$"))
+    
+    start_date <- as.Date(
+      case_when(
+      Quarter == "1" ~ sprintf("%s/04/01", Year_Start),
+      Quarter == "2" ~ sprintf("%s/07/01", Year_Start),
+      Quarter == "3" ~ sprintf("%s/10/01", Year_Start),
+      Quarter == "4" ~ sprintf("%s/01/01", Year_Start+1),
+      ),
+    format = "%Y/%m/%d"
+    )
+    
   }
   # Otherwise raise error
   else{
@@ -401,6 +482,21 @@ end_date <- function(date) {
     start_date <- as.Date(
       sprintf("20%s/01/01", Year_End),
       format = "%Y/%m/%d")
+  }  
+  # Quarterly data e.g. 2013/14 Q1
+  else if (grepl("^\\d{4}/\\d{2} Q\\d{1}$",date)) {
+    Year_Start <- as.numeric(stringr::str_extract(date,"^\\d{4}"))
+    Quarter <-  as.numeric(stringr::str_extract(date,"\\d{1}$"))
+    
+    start_date <- as.Date(
+      case_when(
+        Quarter == "1" ~ sprintf("%s/06/30", Year_Start),
+        Quarter == "2" ~ sprintf("%s/09/30", Year_Start),
+        Quarter == "3" ~ sprintf("%s/12/31", Year_Start),
+        Quarter == "4" ~ sprintf("%s/03/31", Year_Start+1),
+      ),
+      format = "%Y/%m/%d"
+    )
   }
   # Otherwise raise error
   else{
@@ -424,6 +520,9 @@ for (i in 1:nrow(ids)){
   } 
   else if (ids$AreaType[i] == "LA") {
     data_i <- process_LA_data(ids$FingerTips_id[[i]])
+  }
+  else if (ids$AreaType[i] == "England") {
+    data_i <- process_Eng_data(ids$FingerTips_id[[i]])   
   }
   else {
     stop(error = "Unexpected AreaTypeID. Only GP (7) and LA (502) implemented.")
@@ -564,6 +663,30 @@ output_meta <- collected_meta %>%
     ),
     # Update LARC caveats text
     Caveats = case_when(
+      IndicatorID == 15 ~ paste(
+        "Solihull data not available for some years due to small numbers.", 
+        Caveats
+      ),
+      IndicatorID == 17 ~ paste(
+        "One GP in 2012/13 missing due to missing source data. This GP has therefore been omitted from the 2012/13 value calculation.", 
+        Caveats
+      ),
+      IndicatorID == 20 ~ paste(
+        "Data for between 1 (0.55%) and 14 (7.7%) of GPs missing each year from 2009/10 to 2021/22 except 2015/16. These GPs have therefore been omitted from the 2012/13 value calculation.", 
+        Caveats
+      ),
+      IndicatorID == 27 ~ paste(
+        "Birmingham values from 2016/17 to 23/24 and Solihul value for 2016/17 not published due to data quality reasons.", 
+        Caveats
+      ),
+      IndicatorID == 34 ~ paste(
+        "Source data not available for 1 GP (0.55%) in 2019/20 and 2020/21. This GP has therefore been omitted from the 2012/13 value calculation for these years.", 
+        Caveats
+      ),
+      IndicatorID == 57 ~ paste(
+        "Solihull value not published in 2019/20 due for data quality reasons.", 
+        Caveats
+      ),
       IndicatorID == 130 ~ paste(
         "Solihull data currently unavailable.", 
         Caveats
@@ -608,7 +731,7 @@ output_meta <- collected_meta %>%
   left_join(
     meta,
     join_by(ItemLabel)) %>%
-  select(c(IndicatorID,ItemID,MetaValue)) %>%
+  select(c(IndicatorID, ItemID, MetaValue)) %>%
   arrange(IndicatorID, ItemID)
 
 #################################################################

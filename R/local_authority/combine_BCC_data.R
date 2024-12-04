@@ -39,6 +39,51 @@ for (i in 1:length(dfs)) {
         InsertDate = as.Date("30/04/2024", format  = "%d/%m/%Y") 
       ) %>%
       select(-c(a_prime, Z))
+   }
+  
+  # Recalculate ICB values for child overweight indicators
+  if (id_i[[1]] == 8 | id_i[[1]] == 9) {
+    # remove current ICB data
+    dfs[[i]] <- dfs[[i]] %>%
+      filter(
+        AggregationID != 148
+      )
+    
+    # Calculate ICB values
+    df_ICB <- dfs[[i]] %>%
+      filter(
+        # Filter for Birmingham and Solihull values
+        AggregationID %in% c(146, 147)
+      ) %>%
+      group_by(
+        IndicatorID, IndicatorStartDate, 
+        IndicatorEndDate, InsertDate 
+      ) %>%
+      summarise(
+        Numerator = sum(Numerator),
+        Denominator = sum(Denominator)
+      ) %>%
+      mutate(
+        ValueID = NA,
+        p = Numerator / Denominator,
+        IndicatorValue = 100 * p,
+        Z = qnorm(0.975),
+        LowerCI95 =  100 * (p + Z^2/(2*Denominator) - Z * sqrt((p*(1-p)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+        UpperCI95 = 100 * (p + Z^2/(2*Denominator) + Z * sqrt((p*(1-p)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
+        AggregationID = 148,
+        DemographicID = 28,
+        DataQualityID = 1
+      ) %>%
+      select(
+        ValueID, IndicatorID, InsertDate, Numerator, Denominator,
+        IndicatorValue, LowerCI95, UpperCI95, AggregationID,
+        DemographicID,DataQualityID,IndicatorStartDate,IndicatorEndDate
+      )
+   # Append ICB values
+    dfs[[i]] <- rbind(dfs[[i]], df_ICB) %>%
+      arrange(
+        AggregationID, IndicatorStartDate
+      )
   }
   
   # select and reorder columns so they match
@@ -119,7 +164,10 @@ OF_meta$MetaValue <- gsub("<.*?>", "", OF_meta$MetaValue)
 #################################################################
 
 # look at level of missing data
-missing_data_check <- OF_values %>% summarise(across(everything(), ~ sum(is.na(.))))
+missing_data_check <- OF_values %>% 
+  summarise(
+    across(everything(), ~ sum(is.na(.)))
+    )
 cat("Value missing data check:\n")
 print(missing_data_check)
 
@@ -154,7 +202,7 @@ if (!(ID_match_check1 & ID_match_check2)) {
   print(value_IndicatorIDs)
 }
 
-# check sense check on confidence intervals
+# Sense check on confidence intervals
 if ((any(OF_values$LowerCI95 > OF_values$IndicatorValue))) {
   stop("One or more LowerCI95 > IndicatorValue")
 } else if ((any(OF_values$UpperCI95 < OF_values$IndicatorValue))) {
@@ -167,6 +215,46 @@ if (min(OF_values$IndicatorStartDate) < as.Date("01/01/1997",format = "%d/%m/%Y"
 } else if (max(OF_values$IndicatorStartDate) > Sys.Date()) {
   stop("Maximum dates is in the future.")
 }
+
+# Check geographies available for each indicator
+aggregation_types <- readxl::read_excel(
+  "../../data/OF-Other-Tables.xlsx",
+  sheet = "Aggregation"
+) %>%
+  mutate(
+    AggregationType = case_when(
+      AggregationID == 146 ~ "LA-Solihull",
+      AggregationID == 147 ~ "LA-Birmingham",
+      TRUE ~ AggregationType
+    )
+  ) %>%
+  select(
+    AggregationID, 
+    AggregationType
+  )
+
+geography_check <- OF_values %>%
+  left_join(
+    aggregation_types,
+    by = join_by(AggregationID)
+  ) %>%
+  count(IndicatorID, AggregationType) %>%
+  tidyr::pivot_wider(
+    id_cols = IndicatorID,
+    names_from = AggregationType,
+    values_from = n
+  ) %>%
+  select(
+    IndicatorID, PCN, `Locality (registered)`, 
+    Ward, `Constituency`,`Locality (resident)`,
+    `LA-Solihull`, `LA-Birmingham`, ICB, England
+  )
+write.csv(
+  geography_check,
+  "../../data/LA-indicator-geog-checks.csv",
+  row.names = FALSE,
+  na = ""
+  )
 
 # Check that each indicator has a definition 
 missing_definition <- OF_meta %>%
