@@ -11,7 +11,7 @@ OUTCOMES FRAMEWORK: QOF
   SELECT * 
     INTO #LD_Dataset
 	FROM (
-                  SELECT PRACTICE_CODE
+                  SELECT DISTINCT PRACTICE_CODE
 		                ,PRACTICE_NAME
 		                ,yyyymm
 		                ,DATASET
@@ -34,7 +34,7 @@ OUTCOMES FRAMEWORK: QOF
     
   SELECT * 
 	FROM (
-                  SELECT PRACTICE_CODE
+                  SELECT DISTINCT PRACTICE_CODE
 		                ,PRACTICE_NAME
 		                ,yyyymm
 		                ,DATASET
@@ -55,7 +55,7 @@ OUTCOMES FRAMEWORK: QOF
     
   SELECT * 
 	FROM (
-                  SELECT PRACTICE_CODE
+                  SELECT DISTINCT PRACTICE_CODE
 		                ,PRACTICE_NAME
 		                ,yyyymm
 		                ,DATASET

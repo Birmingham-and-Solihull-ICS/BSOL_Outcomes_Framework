@@ -270,7 +270,7 @@ demo_table <-
 # Manual addition for additional BCC indicators.
 # Manually added to SQL server, but included here for rebuild.
 
-persons_only <- c("18-64 yrs", "14+ yrs", "<18 yrs")
+persons_only <- c("18-64 yrs", "14+ yrs")
 
 bcc_append <-
   data.frame(DemographicLabel = paste0("Persons: ", persons_only)
@@ -305,8 +305,8 @@ bcc_append <-
 bcc_append <-
   bcc_append %>% 
   bind_rows(
-    data.frame(DemographicLabel = "Female: 50-70 yrs"
-               , Gender = "Female"
+    data.frame(DemographicLabel = "Persons: 50-70 yrs"  # Updated to persons after indicator QA
+               , Gender = "Persons"
                , AgeGrp = "50-70 yrs"
                , IMD = NA
                , Ethnicity = NA)
@@ -319,7 +319,122 @@ demo_table <-
   bind_rows(bcc_append)
 
 
+
+################################################################################
+
+# Manual addition for Indicator 90 age range 5-17
+# Manually added to SQL server, but included here for rebuild.
+
+persons_517 <- data.frame (
+  AgeGrp = c("5-17 yrs")
+)
+
+append_517 <-
+  data.frame(DemographicLabel = paste0("Persons: ", persons_517)
+             , Gender = "Persons"
+             , AgeGrp = persons_517[[1]]
+             , IMD = NA
+             , Ethnicity = NA)
+
+
+
+# Age Gender Ethnicity
+persons_517_E <- persons_517  %>% cross_join(ethnic_codes) %>%
+  mutate(DemographicLabel = paste0('Persons: ', AgeGrp,': ',ONSGroup) ,
+         Gender = 'Persons',
+         AgeGrp = AgeGrp,
+         IMD = NA,
+         Ethnicity = ONSGroup
+  ) %>%
+  select(DemographicLabel, Gender, AgeGrp, Ethnicity, IMD)
+
+
+
+append_517 <- 
+  append_517 %>% 
+  bind_rows(persons_517_E) %>% 
+  select(DemographicLabel, Gender, AgeGrp, IMD, Ethnicity)
+
+
+# add into main table
+demo_table <- 
+  demo_table %>% 
+  bind_rows(append_517)
+
+
+
 ###############################################################################
+# New values added for Indicator for < 1yr, Ethnicity, no deprivation
+
+
+persons_lt1 <- data.frame (
+  AgeGrp = c("<1 yr (including <28 days)", "<28 days")
+)
+
+append_lt1 <-
+  persons_lt1  %>% cross_join(ethnic_codes) %>%
+  mutate(DemographicLabel = paste0('Persons: ', AgeGrp,': ',ONSGroup) ,
+         Gender = 'Persons',
+         AgeGrp = AgeGrp,
+         IMD = NA,
+         Ethnicity = ONSGroup
+  ) %>%
+  select(DemographicLabel, Gender, AgeGrp, Ethnicity, IMD)
+
+# add into main table
+demo_table <- 
+  demo_table %>% 
+  bind_rows(append_lt1)
+
+
+###############################################################################
+# New values added for Indicator for < 37 weeks gestation
+
+persons_37 <- data.frame (
+  AgeGrp = c(">=37 weeks gestational age at birth", "<37 weeks gestational age at birth")
+)
+
+append_37 <-
+  persons_37 %>% 
+  mutate(DemographicLabel = paste0('Persons: ', AgeGrp)
+             , Gender = "Persons"
+             , AgeGrp = AgeGrp
+             , IMD = NA
+             , Ethnicity = NA) %>% 
+  select(DemographicLabel, Gender, AgeGrp, Ethnicity, IMD)
+
+
+# add into main table
+demo_table <- 
+  demo_table %>% 
+  bind_rows(append_37)
+
+################################################################################
+# Missed pooled ethnicity values for this age range
+
+
+persons_lt1_2 <- data.frame (
+  AgeGrp = c("<1 yr (including <28 days)", "<28 days")
+)
+
+append_lt1_2 <-
+  persons_lt1_2  %>% #cross_join(ethnic_codes) %>%
+  mutate(DemographicLabel = paste0('Persons: ', AgeGrp) ,
+         Gender = 'Persons',
+         AgeGrp = AgeGrp,
+         IMD = NA,
+         Ethnicity = NA
+  ) %>%
+  select(DemographicLabel, Gender, AgeGrp, Ethnicity, IMD)
+
+# add into main table
+demo_table <- 
+  demo_table %>% 
+  bind_rows(append_lt1)
+
+
+
+#################################################################################
 # Write output
 library(DBI)
 con <- dbConnect(odbc::odbc(), .connection_string = "Driver={SQL Server};server=MLCSU-BI-SQL;database=EAT_Reporting_BSOL", 
@@ -331,5 +446,3 @@ con <- dbConnect(odbc::odbc(), .connection_string = "Driver={SQL Server};server=
 out_tbl_demo <- Id("OF","Demographic")  
 DBI::dbExecute(con, "TRUNCATE TABLE [OF].[Demographic]")
 DBI::dbWriteTable(con, out_tbl_demo, demo_table, overwrite = FALSE, append = TRUE)
-
-
