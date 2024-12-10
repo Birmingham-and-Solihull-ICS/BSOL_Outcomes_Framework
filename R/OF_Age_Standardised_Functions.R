@@ -67,7 +67,7 @@ popfile_ward <- read.csv("data/c21_a18_e20_s2_ward.csv", header = TRUE, check.na
 #3.1 Load the indicator data from the warehouse --------------------------------
 
 # Insert which indicator IDs to extract
-indicator_ids <- c(10, 11, 13, 19, 24, 26, 49, 50, 51, 59, 104, 109, 114, 115, 124, 129)
+indicator_ids <- c(10,11,13,19, 24, 26, 49, 50, 51, 59, 104, 109, 114, 115, 124, 129)
 
 # Convert the indicator IDs to a comma-separated string
 indicator_ids_string <- paste(indicator_ids, collapse = ", ")
@@ -240,11 +240,11 @@ get_numerator <- function(indicator_data, indicator_id, reference_id = NA, min_a
 }
 
 # Example
-# my_numerator <- get_numerator(indicator_data = indicator_data,
-#                               indicator_id = 109,
-#                               reference_id = "90808",
-#                               min_age = 15,
-#                               max_age = 24)
+my_numerator <- get_numerator(indicator_data = indicator_data,
+                              indicator_id = 109,
+                              reference_id = "90808",
+                              min_age = 15,
+                              max_age = 24)
 
 
 ##4.3 Function 3: Create denominator dataset  ----------------------------------

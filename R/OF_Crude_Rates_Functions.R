@@ -708,7 +708,7 @@ results <- indicators_params %>%
   
 
 # Remove the '2024/2025' Fiscal Year from the final output and future dates
-results <- result %>% 
+results <- results %>% 
   filter(FiscalYear != '2024/2025') %>% 
   filter(!(as.Date(IndicatorEndDate, format = "%Y-%m-%d") > as.Date("2024-04-01", format = "%Y-%m-%d")))
 
@@ -729,7 +729,7 @@ dbWriteTable(
   sql_connection,
   Id(schema = "dbo", table = "BSOL_0033_OF_Crude_Rates"),
   results, # Processed dataset
-# append = TRUE # Append data to the existing table
+ # append = TRUE # Append data to the existing table
   overwrite = TRUE
 )
 
