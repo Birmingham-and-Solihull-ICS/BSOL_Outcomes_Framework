@@ -664,35 +664,31 @@ output_meta <- collected_meta %>%
     ),
     # Update LARC caveats text
     Caveats = case_when(
-      IndicatorID == 15 ~ paste(
-        "Solihull data not available for some years due to small numbers.",
-        Caveats
-      ),
+      IndicatorID == 6 ~ "Nationally, 99.4% of records are linked successfully. However, not all births are recorded with a valid birth weight and gestational age.",
+      IndicatorID == 7 ~ "The date of conception is estimated using recorded gestation for abortions and stillbirths, and assuming 38 weeks gestation for live births.",
+      IndicatorID == 8 ~ "There is the potential for error in the collection, collation and interpretation of the data (possible bias from poor response rates/selective opt out).",
+      IndicatorID == 9 ~ "There is the potential for error in the collection, collation and interpretation of the data (possible bias from poor response rates/selective opt out).",
+      IndicatorID == 12 ~ "ICB data is experimental data and should be treated with caution. It is not an official statistic.",
+      IndicatorID == 15 ~ "Solihull data not available for some years due to small numbers. The counting method may result in individuals being counted again under other conditions if more than one contributory cause.",
       IndicatorID == 17 ~ paste(
         "One GP in 2012/13 missing due to missing source data. This GP has therefore been omitted from the 2012/13 value calculation.",
         Caveats
       ),
-      IndicatorID == 20 ~ paste(
-        "Data for between 1 (0.55%) and 14 (7.7%) of GPs missing each year from 2009/10 to 2021/22 except 2015/16. These GPs have therefore been omitted from the 2012/13 value calculation.",
-        Caveats
-      ),
-      IndicatorID == 27 ~ paste(
-        "Birmingham values from 2016/17 to 23/24 and Solihul value for 2016/17 not published due to data quality reasons.",
-        Caveats
-      ),
-      IndicatorID == 34 ~ paste(
-        "Source data not available for 1 GP (0.55%) in 2019/20 and 2020/21. This GP has therefore been omitted from the 2012/13 value calculation for these years.",
-        Caveats
-      ),
-      IndicatorID == 57 ~ paste(
-        "Solihull value not published in 2019/20 due for data quality reasons.",
-        Caveats
-      ),
-      IndicatorID == 130 ~ paste(
-        "Solihull data currently unavailable.",
-        Caveats
-      ),
+      IndicatorID == 20 ~ "Data for between 1 (0.55%) and 14 (7.7%) of GPs missing each year from 2009/10 to 2021/22 except 2015/16. These GPs have therefore been omitted from the 2012/13 value calculation. Indicator may be based on a small number of patients for some GPs.",
+      IndicatorID == 23 ~ "LARC prescriptions in abortion and maternity/gynaecology settings are not included.  GP prescribing data is all-purpose prescriptions rather than person-based and may not reflect the number of women on LARC for contraceptive purposes.",
+      IndicatorID == 27 ~ "Birmingham values from 2016/17 to 23/24 and Solihul value for 2016/17 not published due to data quality reasons. The indicator is based on observation and is therefore susceptible to measurement bias.",
+      IndicatorID == 30 ~ "For some practices, this indicator may be based on a small number of patients. Data may be unreliable for GPs during mergers/boundary changes. For data up to 2021/22, data is only included where the practice had a list size of at least 1000.",
+      IndicatorID == 34 ~ "Source data not available for 1 GP (0.55%) in 2019/20 and 2020/21. This GP has therefore been omitted from the 2012/13 value calculation for these years.",
+      IndicatorID == 44 ~ "The indicator is based on observation and is therefore susceptible to measurement bias. There are known IT issues resulting in high levels of unknowns in the source data. These issues should be resolved as systems embed and improve.",
+      IndicatorID == 45 ~ "This indicator uses prediction equations to adjust the self reported height and weight of respondents. Prediction equations are specific to time, place, target population and methods of data collection and may therefore not always be applicable.",
+      IndicatorID == 47 ~ "This indicator is not perfectly aligned as the numerator data is for 14+ yrs, whereas denominator data covers all ages.",
+      IndicatorID == 55 ~ "ICB data is experimental data and should be treated with caution. It is not an official statistic.",
+      IndicatorID == 57 ~ "Solihull value not published in 2019/20 due for data quality reasons. The denominator is based on only those individuals who have returned a Treatment Outcomes Profile form at both the start of treatment and at their six-month review.",
+      IndicatorID == 71 ~ "There is still considerable variation between local authorities in the reported numbers of Health Checks offered and received. In some cases the variation may be the result of data quality issues.",
+      IndicatorID == 111 ~ "April 2020 to March 2021 and April 2021 to March 2022 data covers the time period affected by the COVID19 pandemic and therefore data for this period should be interpreted with caution.",
+      IndicatorID == 130 ~ "Solihull data currently unavailable. GP activity is assigned to the host local authority of the GP practice main base. Women, particularly younger women, may seek to use Sexual and Reproductive Health Services instead of GP services.",
       IndicatorID %in% c(118,119) ~ "Indicator presented as the mortality rate per 1,000. This is different to FingerTips which gives the equivalenct indicator as a mortality ratio.",
+      IndicatorID == 131 ~ "All English providers of state-funded early years education (including academies and free schools), private, voluntary and independent (PVI) sectors are within the scope of the early years foundation stage profile (EYFSP) data collection.",
       TRUE ~ Caveats
     ),
     # Update NDTMS denominator Definition
@@ -736,7 +732,7 @@ output_meta <- collected_meta %>%
   arrange(IndicatorID, ItemID)
 
 #Remove white space
-collected_meta$MetaValue <- gsub("\\s+", " ", collected_meta$MetaValue)
+output_meta$MetaValue <- gsub("\\s+", " ", output_meta$MetaValue)
 
 
 #################################################################

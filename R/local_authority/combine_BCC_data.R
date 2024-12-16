@@ -192,9 +192,9 @@ print(missing_meta_check)
 cat("\nMeta missing data check:\n")
 too_long_check <- OF_meta %>%
   mutate(StrLen = nchar(MetaValue)) %>%
-  filter(StrLen >= 250) %>%
-  select(IndicatorID, ItemID, StrLen)
-print(too_long_check)
+  filter(StrLen >= 250)  %>%
+  select(IndicatorID, ItemID, StrLen, MetaValue)
+print(too_long_check %>% select(IndicatorID, ItemID, StrLen))
 
 # Check that we have meta for all values
 value_IndicatorIDs <- sort(unique(OF_values$IndicatorID))
