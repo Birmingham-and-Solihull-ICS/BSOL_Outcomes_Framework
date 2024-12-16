@@ -53,19 +53,19 @@ fetch_meta <- function(FingerTips_id) {
 fetch_data <- function(FingerTips_id, AreaTypeID) {
   # Fetch data from FingerTips using API
   data <- fingertips_data(
-    AreaTypeID = AreaTypeID, 
+    AreaTypeID = AreaTypeID,
     IndicatorID = FingerTips_id
-  ) 
-  
+  )
+
   if (FingerTips_id == 93183) {
     data <- data %>%
       filter(
         Age == "14+ yrs"
       )
   }
-  
+
   meta_data <- fetch_meta(FingerTips_id)
-  
+
   return(
     list("data" = data,"meta" = meta_data)
     )
@@ -101,9 +101,9 @@ get_CI_method <- function(meta) {
 select_final_cols <- function(df) {
   df <- df %>%
     select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value,
       LowerCI95, UpperCI95, magnitude, CI_method
-    ) %>% 
+    ) %>%
     select(
       -c(magnitude, CI_method)
       )
@@ -111,21 +111,21 @@ select_final_cols <- function(df) {
 }
 
 process_LA_data <- function(FingerTips_id) {
-  
+
   data_and_meta <- fetch_data(FingerTips_id, AreaTypeID = 502)
   data <- data_and_meta[["data"]]
   meta <- data_and_meta[["meta"]]
   # delete list to save space
   rm(data_and_meta)
-  
+
   # restrict to needed columns
   data <- data %>%
     mutate(
-      LowerCI95 = LowerCI95.0limit, 
+      LowerCI95 = LowerCI95.0limit,
       UpperCI95 = UpperCI95.0limit
       ) %>%
     select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value,
       LowerCI95, UpperCI95
     ) %>%
     mutate(
@@ -137,18 +137,18 @@ process_LA_data <- function(FingerTips_id) {
         #  then estimate the count from these
         !is.na(Denominator) & !is.na(Value) ~ Denominator * Value / magnitude
       )
-    ) 
-  
+    )
+
   # England data
-  df_eng <- data %>% 
+  df_eng <- data %>%
     filter(AreaCode == "E92000001")
-  
+
   # Filter for Birmingham and Solihull
   df_LA <- data %>%
     filter(
       AreaCode %in% c("E08000029", "E08000025")
-      ) 
-  
+      )
+
   df_ICB <- df_LA %>%
     group_by(Timeperiod, Sex, Age,  magnitude, CI_method) %>%
     summarise(
@@ -176,56 +176,56 @@ process_LA_data <- function(FingerTips_id) {
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
-    ) %>% 
-    ungroup() 
+    ) %>%
+    ungroup()
 
   combined_data <- rbindlist(
     list(
-      select_final_cols(df_LA), 
-      select_final_cols(df_ICB), 
+      select_final_cols(df_LA),
+      select_final_cols(df_ICB),
       select_final_cols(df_eng)
     )
-  ) 
-  
+  )
+
   output <- list(
     "data" = combined_data,
     "meta" = meta
   )
-  
+
   return(output)
 }
 
 process_GP_data <- function(FingerTips_id) {
-  
+
   data_and_meta <- fetch_data(FingerTips_id, AreaTypeID = 7)
   data <- data_and_meta[["data"]]
   meta <- data_and_meta[["meta"]]
   # delete list to save space
   rm(data_and_meta)
-  
+
   # restrict to needed columns
   data <- data %>%
     mutate(
-      LowerCI95 = LowerCI95.0limit, 
+      LowerCI95 = LowerCI95.0limit,
       UpperCI95 = UpperCI95.0limit
       )%>%
     select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value,
       LowerCI95, UpperCI95
     ) %>%
     mutate(
       magnitude = get_magnitude(meta),
       CI_method = get_CI_method(meta),
       missing = is.na(Count) | is.na(Denominator)
-    ) 
-  
+    )
+
   GP_data  <- data %>%
     inner_join(
-      GP_lookup, 
+      GP_lookup,
       join_by(AreaCode == "Practice_Code")
     )
-  
-  # Check for any missing values and print percentage missing before these 
+
+  # Check for any missing values and print percentage missing before these
   # rows are removed
   missing_check <- GP_data %>%
     group_by(
@@ -238,7 +238,7 @@ process_GP_data <- function(FingerTips_id) {
     filter(
       num_missing > 0
     )
-  
+
   # Report any missing data
   if (nrow(missing_check) > 0) {
     print(
@@ -246,12 +246,12 @@ process_GP_data <- function(FingerTips_id) {
       )
     print(missing_check)
   }
-  
-  
+
+
   # England data
-  df_eng <- data %>% 
+  df_eng <- data %>%
     filter(AreaCode == "E92000001")
-  
+
   # Aggregate for PCNs
   df_PCN <- GP_data %>%
     # Remove rows with missing Numerator or Denominator
@@ -280,12 +280,12 @@ process_GP_data <- function(FingerTips_id) {
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
-    ) %>% 
-    ungroup() 
-  
+    ) %>%
+    ungroup()
+
   # Aggregate for Localities
   df_Locality <- df_PCN %>%
-    inner_join(PCN_lookup, 
+    inner_join(PCN_lookup,
                join_by(AreaCode == "PCN_Code")) %>%
     group_by(Locality_Code, LA_Code, Timeperiod, Sex, Age,  magnitude, CI_method) %>%
     summarise(
@@ -309,8 +309,8 @@ process_GP_data <- function(FingerTips_id) {
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
-    ) %>% 
-    ungroup() 
+    ) %>%
+    ungroup()
 
   # Aggregate for local authorities
   df_LA <- df_Locality %>%
@@ -336,9 +336,9 @@ process_GP_data <- function(FingerTips_id) {
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
-    ) %>% 
-    ungroup() 
-  
+    ) %>%
+    ungroup()
+
   # Aggregate for BSol ICB
   df_ICB <- df_LA %>%
     group_by(Timeperiod, Sex, Age,  magnitude, CI_method) %>%
@@ -366,25 +366,25 @@ process_GP_data <- function(FingerTips_id) {
         CI_method == "Wilson's Method" ~ magnitude * (p_hat + Z^2/(2*Denominator) + Z * sqrt((p_hat*(1-p_hat)/Denominator) + Z^2/(4*Denominator^2))) / (1 + Z^2/Denominator),
         CI_method == "Byar's Method" ~ magnitude * a_prime * (1 - 1/(9*a_prime) + Z/3 * sqrt(1/a_prime))**3/Denominator
       )
-    ) %>% 
-    ungroup() 
+    ) %>%
+    ungroup()
 
-  # 
+  #
   combined_data <- rbindlist(
     list(
-      select_final_cols(df_PCN), 
-      select_final_cols(df_Locality), 
-      select_final_cols(df_LA), 
-      select_final_cols(df_ICB), 
+      select_final_cols(df_PCN),
+      select_final_cols(df_Locality),
+      select_final_cols(df_LA),
+      select_final_cols(df_ICB),
       select_final_cols(df_eng)
     )
-  ) 
-  
+  )
+
   output <- list(
     "data" = combined_data,
     "meta" = meta
   )
-  
+
   return(output)
 }
 
@@ -395,37 +395,37 @@ process_Eng_data <- function(FingerTips_id) {
   meta <- data_and_meta[["meta"]]
   # delete list to save space
   rm(data_and_meta)
-  
+
   data <- data %>%
     mutate(
-      LowerCI95 = LowerCI95.0limit, 
+      LowerCI95 = LowerCI95.0limit,
       UpperCI95 = UpperCI95.0limit
     )%>%
     select(
-      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value, 
+      AreaCode, Timeperiod, Sex, Age, Count, Denominator, Value,
       LowerCI95, UpperCI95
     ) %>%
     distinct()
-  
-  
+
+
   output <- list(
     "data" = data,
     "meta" = meta
   )
-  
+
 }
 
 ## Data processing functions ##
 
 start_date <- function(date) {
-  
+
   # If financial year e.g. 2021/22
   if (grepl("^\\d{4}/\\d{2}$",date)) {
     Year_Start = stringr::str_extract(date,"^\\d{4}")
     start_date <- as.Date(
       sprintf("%s/04/01", Year_Start),
       format = "%Y/%m/%d")
-  } 
+  }
   # If calendar year e.g. 2021
   else if (grepl("^\\d{4}$",date)) {
     start_date <- as.Date(
@@ -443,7 +443,7 @@ start_date <- function(date) {
   else if (grepl("^\\d{4}/\\d{2} Q\\d{1}$",date)) {
     Year_Start <- as.numeric(stringr::str_extract(date,"^\\d{4}"))
     Quarter <-  as.numeric(stringr::str_extract(date,"\\d{1}$"))
-    
+
     start_date <- as.Date(
       case_when(
       Quarter == "1" ~ sprintf("%s/04/01", Year_Start),
@@ -453,7 +453,7 @@ start_date <- function(date) {
       ),
     format = "%Y/%m/%d"
     )
-    
+
   }
   # Otherwise raise error
   else{
@@ -463,18 +463,18 @@ start_date <- function(date) {
 }
 
 end_date <- function(date) {
-  
+
   # If financial year e.g. 2021/22
   if (grepl("^\\d{4}/\\d{2}$",date)) {
     Year_Start = stringr::str_extract(date,"^\\d{4}")
     start_date <- as.Date(
       sprintf("%i/03/31", as.numeric(Year_Start) + 1 ),
       format = "%Y/%m/%d")
-  } 
+  }
   # If calendar year e.g. 2021
   else if (grepl("^\\d{4}$",date)) {
     start_date <- as.Date(
-      sprintf("%s/12/31", date), 
+      sprintf("%s/12/31", date),
       format = "%Y/%m/%d")
   }
   else if (grepl("^\\d{4} - \\d{2}$",date)) {
@@ -482,12 +482,12 @@ end_date <- function(date) {
     start_date <- as.Date(
       sprintf("20%s/01/01", Year_End),
       format = "%Y/%m/%d")
-  }  
+  }
   # Quarterly data e.g. 2013/14 Q1
   else if (grepl("^\\d{4}/\\d{2} Q\\d{1}$",date)) {
     Year_Start <- as.numeric(stringr::str_extract(date,"^\\d{4}"))
     Quarter <-  as.numeric(stringr::str_extract(date,"\\d{1}$"))
-    
+
     start_date <- as.Date(
       case_when(
         Quarter == "1" ~ sprintf("%s/06/30", Year_Start),
@@ -517,29 +517,29 @@ for (i in 1:nrow(ids)){
   print(ids$FingerTips_id[[i]])
   if (ids$AreaType[i] == "GP") {
     data_i <- process_GP_data(ids$FingerTips_id[[i]])
-  } 
+  }
   else if (ids$AreaType[i] == "LA") {
     data_i <- process_LA_data(ids$FingerTips_id[[i]])
   }
   else if (ids$AreaType[i] == "England") {
-    data_i <- process_Eng_data(ids$FingerTips_id[[i]])   
+    data_i <- process_Eng_data(ids$FingerTips_id[[i]])
   }
   else {
     stop(error = "Unexpected AreaTypeID. Only GP (7) and LA (502) implemented.")
   }
-  
+
   # Check that FingerTips provided at least one row of data
   if (nrow(data_i[["data"]]) == 0) {
     stop(error = paste("No data collected for FT ID:", ids$FingerTips_id[[i]]))
   }
-  
+
   # Add in our indicator ID
   data_i[["data"]]$IndicatorID <- ids$IndicatorID[[i]]
-  data_i[["meta"]]$IndicatorID <- ids$IndicatorID[[i]]  
+  data_i[["meta"]]$IndicatorID <- ids$IndicatorID[[i]]
 
   # Store data for ID in list
   all_data[[i]] <- data_i[["data"]]
-  all_meta[[i]] <- data_i[["meta"]] 
+  all_meta[[i]] <- data_i[["meta"]]
 }
 
 # Combine all indicator data and meta data
@@ -578,7 +578,7 @@ meta <- readxl::read_excel(
 demographics <- readxl::read_excel(
   "../../data/OF-Other-Tables.xlsx",
   sheet = "Demographic"
-) %>% 
+) %>%
   # Remove repeated entry for "Persons: <18 yrs"
   filter(DemographicID != 7623) %>%
   select(c(DemographicID, DemographicLabel))
@@ -586,7 +586,7 @@ demographics <- readxl::read_excel(
 aggregations <- readxl::read_excel(
   "../../data/OF-Other-Tables.xlsx",
   sheet = "Aggregation"
-) %>% 
+) %>%
   select(c(AggregationID,	AggregationCode))
 
 meta <- readxl::read_excel(
@@ -599,7 +599,7 @@ meta <- readxl::read_excel(
 output_data <- collected_data %>%
   filter(
     # Remove rows with no data
-    !is.na(Value) 
+    !is.na(Value)
   ) %>%
   mutate(
     ValueID = "",
@@ -631,8 +631,8 @@ output_data <- collected_data %>%
     !is.na(DemographicID)
   ) %>%
   select(
-    c("ValueID", "IndicatorID", "InsertDate", 
-      "Numerator", "Denominator", "IndicatorValue", "LowerCI95", "UpperCI95", 
+    c("ValueID", "IndicatorID", "InsertDate",
+      "Numerator", "Denominator", "IndicatorValue", "LowerCI95", "UpperCI95",
       "AggregationID", "DemographicID", "DataQualityID",
       "IndicatorStartDate","IndicatorEndDate"
     )
@@ -648,11 +648,12 @@ simple_defs <- readxl::read_excel(
   mutate(WrittenDefinition = SimpleDefinition) %>%
   select(c(IndicatorID, WrittenDefinition))
 
-# Process meta data
-output_meta <- collected_meta %>% 
+## Process meta data ##
+
+output_meta <- collected_meta %>%
   rbind(collected_additional_meta) %>%
   left_join(
-    simple_defs, 
+    simple_defs,
     join_by(IndicatorID),
     relationship = "one-to-one"
     ) %>%
@@ -664,31 +665,31 @@ output_meta <- collected_meta %>%
     # Update LARC caveats text
     Caveats = case_when(
       IndicatorID == 15 ~ paste(
-        "Solihull data not available for some years due to small numbers.", 
+        "Solihull data not available for some years due to small numbers.",
         Caveats
       ),
       IndicatorID == 17 ~ paste(
-        "One GP in 2012/13 missing due to missing source data. This GP has therefore been omitted from the 2012/13 value calculation.", 
+        "One GP in 2012/13 missing due to missing source data. This GP has therefore been omitted from the 2012/13 value calculation.",
         Caveats
       ),
       IndicatorID == 20 ~ paste(
-        "Data for between 1 (0.55%) and 14 (7.7%) of GPs missing each year from 2009/10 to 2021/22 except 2015/16. These GPs have therefore been omitted from the 2012/13 value calculation.", 
+        "Data for between 1 (0.55%) and 14 (7.7%) of GPs missing each year from 2009/10 to 2021/22 except 2015/16. These GPs have therefore been omitted from the 2012/13 value calculation.",
         Caveats
       ),
       IndicatorID == 27 ~ paste(
-        "Birmingham values from 2016/17 to 23/24 and Solihul value for 2016/17 not published due to data quality reasons.", 
+        "Birmingham values from 2016/17 to 23/24 and Solihul value for 2016/17 not published due to data quality reasons.",
         Caveats
       ),
       IndicatorID == 34 ~ paste(
-        "Source data not available for 1 GP (0.55%) in 2019/20 and 2020/21. This GP has therefore been omitted from the 2012/13 value calculation for these years.", 
+        "Source data not available for 1 GP (0.55%) in 2019/20 and 2020/21. This GP has therefore been omitted from the 2012/13 value calculation for these years.",
         Caveats
       ),
       IndicatorID == 57 ~ paste(
-        "Solihull value not published in 2019/20 due for data quality reasons.", 
+        "Solihull value not published in 2019/20 due for data quality reasons.",
         Caveats
       ),
       IndicatorID == 130 ~ paste(
-        "Solihull data currently unavailable.", 
+        "Solihull data currently unavailable.",
         Caveats
       ),
       IndicatorID %in% c(118,119) ~ "Indicator presented as the mortality rate per 1,000. This is different to FingerTips which gives the equivalenct indicator as a mortality ratio.",
@@ -721,7 +722,7 @@ output_meta <- collected_meta %>%
       IndicatorID == 130 ~ "Birmingham City Council LARC contract data.",
       TRUE ~ `Source of numerator`
     )
-    
+
   ) %>%
   select(-c(Unit, Methodology, WrittenDefinition)) %>%
   tidyr::pivot_longer(
@@ -734,6 +735,10 @@ output_meta <- collected_meta %>%
   select(c(IndicatorID, ItemID, MetaValue)) %>%
   arrange(IndicatorID, ItemID)
 
+#Remove white space
+collected_meta$MetaValue <- gsub("\\s+", " ", collected_meta$MetaValue)
+
+
 #################################################################
 ##                     Save final output                       ##
 #################################################################
@@ -741,13 +746,13 @@ print("------------- Save final output  --------------")
 
 # Save data
 write.csv(
-  output_data, 
+  output_data,
   "../../data/output/birmingham-source/data/LA_FingerTips_data.csv"
   )
 
 # Save meta
 write.csv(
-  output_meta, 
+  output_meta,
   "../../data/output/birmingham-source/meta/LA_FingerTips_meta.csv"
 )
 
