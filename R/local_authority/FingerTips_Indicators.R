@@ -693,17 +693,17 @@ output_meta <- collected_meta %>%
     ),
     # Update NDTMS denominator Definition
     `Definition of denominator` = case_when(
-      IndicatorID == 8 ~ "Number of children in reception (aged 4 to 5 years) with a valid height and weight measured by the NCMP with a BMI classified as overweight or living with obesity, including severe obesity.",
-      IndicatorID == 9 ~ "Number of children in reception (aged 10 to 11 years) with a valid height and weight measured by the NCMP with a BMI classified as overweight or living with obesity, including severe obesity.",
+      IndicatorID == 8 ~ "Number of children in reception (aged 4 to 5 years) with a valid height and weight measured by the NCMP.",
+      IndicatorID == 9 ~ "Number of children in reception (aged 10 to 11 years) with a valid height and weight measured by the NCMP.",
       IndicatorID == 12 ~ "Total number of children whose second birthday falls within the time period who received a booster dose of Hib and MenC at any time before their second birthday.",
-      IndicatorID == 15 ~ "Completion of a CVI (certificate of visual impairment) by a consultant ophthalmologist, initiates the process of registration with a local authority and leads to access to services.",
-      IndicatorID == 20 ~ "The number of women aged 50 to 70, registered to the practice on the last day of the review period, who were invited for breast screening in the previous 12 months and who had a breast screening test result within 6 months of the invitation.",
+      IndicatorID == 15 ~ "ONS mid year population estimates: Single year of age and sex for local authorities in England for relevant year. Aggregated for persons aged 12 and over",
+      IndicatorID == 20 ~ "The total number of women aged 50 to 70, registered to the practice on the last day of the review period, who were invited for breast screening in the previous 12 months.",
       IndicatorID == 44 ~ "Number of women known to smoke at time of delivery."
-      IndicatorID == 45 ~ "Number of adults aged 18 and over with a BMI classified as overwight (BMI>25kg/m²), calculated from the adjusted height and weight variables.",
+      IndicatorID == 45 ~ "Number of adults aged 18 years and over with valid height and weight recorded.",
       IndicatorID == 118 ~ "The number of adults in drug treatment in the local authority.",
       IndicatorID == 119 ~ "The number of adults in alcohol treatment in the local authority.",
       IndicatorID == 130 ~ "GP-registered female population aged 15-44 years.",
-      IndicatorID == 131 ~ "All children defined as having reached a good level of development at the end of the early years foundation stage (EYFS) by local authority."
+      IndicatorID == 131 ~ "All children eligible for the Early years foundation stage (EYFS) Profile by local authority."
       TRUE ~ `Definition of numerator`
     ),
     `Rate Type` = case_when(
@@ -711,7 +711,15 @@ output_meta <- collected_meta %>%
       TRUE ~ `Rate Type`
     ),
     `Definition of numerator` = case_when(
+      IndicatorID == 8 ~ "Number of children in reception (aged 4 to 5 years) with a valid height and weight measurement living with obesity or severe obesity.",
+      IndicatorID == 9 ~ "Number of children in reception (aged 10 to 11 years) with a valid height and weight measurement living with obesity or severe obesity.",
+      IndicatorID == 12 ~ "Total number of children whose second birthday falls within the time period who received a booster dose of Hib and MenC at any time before their second birthday.",
+      IndicatorID == 15 ~ "Number of CVI (certificate of visual impairment) certificates completed by a consultant ophthalmologist, initiates the process of registration with a local authority and leads to access to services.",
+      IndicatorID == 20 ~ "Number of women aged 50 to 70, registered to the practice on the last day of the review period invited for breast screening in the previous 12 months.",
+      IndicatorID == 30 ~ "The number of persons registered to the practice aged 60 to 75 invited for screening in the previous 12 months who were screened adequately following an initial response within 6 months of invitation.",
+      IndicatorID == 34 ~ "Total number of children who received one dose of MMR vaccine on or after their first birthday and at any time up to their second birthday.",
       IndicatorID == 130 ~ "GP prescribed long acting reversible contraception excluding injections",
+      IndicatorID == 131 ~ "All children defined as having reached a good level of development at the end of the early years foundation stage (EYFS) by local authority.",
       TRUE ~ `Simple Definition`
     ),
     `Simple Definition` = case_when(
