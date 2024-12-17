@@ -695,16 +695,20 @@ output_meta <- collected_meta %>%
     `Definition of denominator` = case_when(
       IndicatorID == 8 ~ "Number of children in reception (aged 4 to 5 years) with a valid height and weight measured by the NCMP.",
       IndicatorID == 9 ~ "Number of children in reception (aged 10 to 11 years) with a valid height and weight measured by the NCMP.",
-      IndicatorID == 12 ~ "Total number of children whose second birthday falls within the time period who received a booster dose of Hib and MenC at any time before their second birthday.",
+      IndicatorID == 12 ~ "Total number of children whose second birthday falls within the time period.",
       IndicatorID == 15 ~ "ONS mid year population estimates: Single year of age and sex for local authorities in England for relevant year. Aggregated for persons aged 12 and over",
+      IndicatorID == 17 ~ "Total number of patients recorded as current smokers.",
       IndicatorID == 20 ~ "The total number of women aged 50 to 70, registered to the practice on the last day of the review period, who were invited for breast screening in the previous 12 months.",
-      IndicatorID == 44 ~ "Number of women known to smoke at time of delivery."
+      IndicatorID == 44 ~ "Number of women known to smoke at time of delivery.",
       IndicatorID == 45 ~ "Number of adults aged 18 years and over with valid height and weight recorded.",
+      IndicatorID == 55 ~ "Total number of children in LA responsible population whose second birthday falls within the time period.",
+      IndicatorID == 71 ~ "Number of people aged 40-74 eligible for an NHS Health Check in the financial year.",
+      IndicatorID == 111 ~ "The number of women aged 53 to 70 years resident in the area who are eligible for breast screening at a given point in time, excluding those whose recall has been ceased for clinical reasons.",
       IndicatorID == 118 ~ "The number of adults in drug treatment in the local authority.",
       IndicatorID == 119 ~ "The number of adults in alcohol treatment in the local authority.",
       IndicatorID == 130 ~ "GP-registered female population aged 15-44 years.",
-      IndicatorID == 131 ~ "All children eligible for the Early years foundation stage (EYFS) Profile by local authority."
-      TRUE ~ `Definition of numerator`
+      IndicatorID == 131 ~ "All children eligible for the Early years foundation stage (EYFS) Profile by local authority.",
+      TRUE ~ `Definition of denominator`
     ),
     `Rate Type` = case_when(
       IndicatorID %in% c(118,119) ~ "Crute rate per 1,000",
@@ -718,9 +722,11 @@ output_meta <- collected_meta %>%
       IndicatorID == 20 ~ "Number of women aged 50 to 70, registered to the practice on the last day of the review period invited for breast screening in the previous 12 months.",
       IndicatorID == 30 ~ "The number of persons registered to the practice aged 60 to 75 invited for screening in the previous 12 months who were screened adequately following an initial response within 6 months of invitation.",
       IndicatorID == 34 ~ "Total number of children who received one dose of MMR vaccine on or after their first birthday and at any time up to their second birthday.",
+      IndicatorID == 44 ~ "Number of women known to smoke at time of delivery.",
+      IndicatorID == 45 ~ "Number of adults aged 18 and over with a BMI classified as overweight (including obesity), calculated from the adjusted height and weight variables. Adults are defined as obese if their BMI > 25kg/m².",
       IndicatorID == 130 ~ "GP prescribed long acting reversible contraception excluding injections",
       IndicatorID == 131 ~ "All children defined as having reached a good level of development at the end of the early years foundation stage (EYFS) by local authority.",
-      TRUE ~ `Simple Definition`
+      TRUE ~ `Definition of numerator`
     ),
     `Simple Definition` = case_when(
       IndicatorID == 8 ~ "Proportion of children aged 4 to 5 years classified as overweight or living with obesity.",
@@ -729,22 +735,25 @@ output_meta <- collected_meta %>%
       IndicatorID == 15 ~ "New Certifications of Visual Impairment (CVI) due to diabetic eye disease aged 12 and over, rate per 100,000 population.",
       IndicatorID == 20 ~ "The percentage of eligible women aged 50 to 70 who had a breast screening test result recorded within 6 months of receiving a screening invitation.",
       IndicatorID == 30 ~ "The percentage of eligible persons aged 60 to 75 who were screened adequately following an initial response within 6 months of receiving a screening invitation.",
-      IndicatorID == 34 ~ "The percengage of children for whom the local authority is responsible who received one dose of MMR vaccine between their first and second birthday. ",
+      IndicatorID == 34 ~ "The percengage of children for whom the local authority is responsible who received one dose of MMR vaccine between their first and second birthday.",
+      IndicatorID == 45 ~ "The percentage of adults aged 18 and over with a BMI classified as overweight (including obesity), calculated from the adjusted height and weight variables. Adults are defined as obese if their BMI > 25kg/m².",
       IndicatorID == 130 ~ "Crude rate of GP prescribed long acting reversible contraception excluding injections per 1,000 GP-registered female population aged 15-44 years",
       TRUE ~ `Simple Definition`
     ),
     `Source of denominator` =  case_when(
+      IndicatorID == 27 ~ "OHID Child and maternal health statistics - Breastfeeding statisticshttps://www.gov.uk/government/collections/child-and-maternal-health-statistics#breastfeeding-statistics",
       IndicatorID == 130 ~ "Birmingham and Solihull GP registration data.",
       TRUE ~ `Source of denominator`
     ),
     `Source of numerator`=  case_when(
+      IndicatorID == 27 ~ "OHID Child and maternal health statistics - Breastfeeding statisticshttps://www.gov.uk/government/collections/child-and-maternal-health-statistics#breastfeeding-statistics",
       IndicatorID == 130 ~ "Birmingham City Council LARC contract data.",
       TRUE ~ `Source of numerator`
     ),
     `External Reference` = case_when(
-      IndicatorID == 21 ~ "http://www.ons.gov.uk/ons/guide-method/user-guidance/health-and-life-events/index.html"
+      IndicatorID == 21 ~ "http://www.ons.gov.uk/ons/guide-method/user-guidance/health-and-life-events/index.html",
       IndicatorID == 23 ~ "http://fingertips.phe.org.uk/profile/sexualhealth",
-      IndicatorID == 111 ~ "Standards: https://www.gov.uk/government/collections/nhs-population-screening-programme-standards KPIs: https://www.gov.uk/topic/population-screening-programmes/population-screening-data-key-performance-indicators"
+      IndicatorID == 111 ~ "Standards: https://www.gov.uk/government/collections/nhs-population-screening-programme-standards KPIs: https://www.gov.uk/topic/population-screening-programmes/population-screening-data-key-performance-indicators",
       IndicatorID == 130 ~ "Related indicators http://fingertips.phe.org.uk/profile/sexualhealth. Further analysis of GP and Sexual and Reproductive Health services: https://fingertips.phe.org.uk/profile/sexualhealth/data#page/13/",
       TRUE ~ `External Reference`
     )

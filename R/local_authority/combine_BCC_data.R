@@ -189,7 +189,7 @@ missing_meta_check <- OF_meta %>% summarise(across(everything(), ~ sum(is.na(.))
 print(missing_meta_check)
 
 # look at meta character length
-cat("\nMeta missing data check:\n")
+cat("\nMeta value length check:\n")
 too_long_check <- OF_meta %>%
   mutate(StrLen = nchar(MetaValue)) %>%
   filter(StrLen >= 250)  %>%
