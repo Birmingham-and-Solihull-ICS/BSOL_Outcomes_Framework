@@ -723,6 +723,13 @@ output_meta <- collected_meta %>%
       TRUE ~ `Simple Definition`
     ),
     `Simple Definition` = case_when(
+      IndicatorID == 8 ~ "Proportion of children aged 4 to 5 years classified as overweight or living with obesity.",
+      IndicatorID == 9 ~ "Proportion of children aged 10 to 11 years classified as overweight or living with obesity",
+      IndicatorID == 12 ~ "Percentage of children for whom the LA is responsible who received a booster dose of Haemophilus influenzae type b and Meningococcal group C vaccine at any time by their second birthday.",
+      IndicatorID == 15 ~ "New Certifications of Visual Impairment (CVI) due to diabetic eye disease aged 12 and over, rate per 100,000 population.",
+      IndicatorID == 20 ~ "The percentage of eligible women aged 50 to 70 who had a breast screening test result recorded within 6 months of receiving a screening invitation.",
+      IndicatorID == 30 ~ "The percentage of eligible persons aged 60 to 75 who were screened adequately following an initial response within 6 months of receiving a screening invitation.",
+      IndicatorID == 34 ~ "The percengage of children for whom the local authority is responsible who received one dose of MMR vaccine between their first and second birthday. ",
       IndicatorID == 130 ~ "Crude rate of GP prescribed long acting reversible contraception excluding injections per 1,000 GP-registered female population aged 15-44 years",
       TRUE ~ `Simple Definition`
     ),
@@ -733,8 +740,14 @@ output_meta <- collected_meta %>%
     `Source of numerator`=  case_when(
       IndicatorID == 130 ~ "Birmingham City Council LARC contract data.",
       TRUE ~ `Source of numerator`
+    ),
+    `External Reference` = case_when(
+      IndicatorID == 21 ~ "http://www.ons.gov.uk/ons/guide-method/user-guidance/health-and-life-events/index.html"
+      IndicatorID == 23 ~ "http://fingertips.phe.org.uk/profile/sexualhealth",
+      IndicatorID == 111 ~ "Standards: https://www.gov.uk/government/collections/nhs-population-screening-programme-standards KPIs: https://www.gov.uk/topic/population-screening-programmes/population-screening-data-key-performance-indicators"
+      IndicatorID == 130 ~ "Related indicators http://fingertips.phe.org.uk/profile/sexualhealth. Further analysis of GP and Sexual and Reproductive Health services: https://fingertips.phe.org.uk/profile/sexualhealth/data#page/13/",
+      TRUE ~ `External Reference`
     )
-
   ) %>%
   select(-c(Unit, Methodology, WrittenDefinition)) %>%
   tidyr::pivot_longer(
