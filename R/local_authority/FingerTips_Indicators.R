@@ -680,7 +680,7 @@ output_meta <- collected_meta %>%
       IndicatorID == 30 ~ "For some practices, this indicator may be based on a small number of patients. Data may be unreliable for GPs during mergers/boundary changes. For data up to 2021/22, data is only included where the practice had a list size of at least 1000.",
       IndicatorID == 34 ~ "Source data not available for 1 GP (0.55%) in 2019/20 and 2020/21. This GP has therefore been omitted from the 2012/13 value calculation for these years.",
       IndicatorID == 44 ~ "The indicator is based on observation and is therefore susceptible to measurement bias. There are known IT issues resulting in high levels of unknowns in the source data. These issues should be resolved as systems embed and improve.",
-      IndicatorID == 45 ~ "This indicator uses prediction equations to adjust the self reported height and weight of respondents. Prediction equations are specific to time, place, target population and methods of data collection and may therefore not always be applicable.",
+      IndicatorID == 45 ~ "This indicator uses prediction equations to adjust the self reported height and weight of respondents. Those not recorded as male or female are excluded from the analysis.",
       IndicatorID == 47 ~ "This indicator is not perfectly aligned as the numerator data is for 14+ yrs, whereas denominator data covers all ages.",
       IndicatorID == 55 ~ "ICB data is experimental data and should be treated with caution. It is not an official statistic.",
       IndicatorID == 57 ~ "Solihull value not published in 2019/20 due for data quality reasons. The denominator is based on only those individuals who have returned a Treatment Outcomes Profile form at both the start of treatment and at their six-month review.",
@@ -693,9 +693,17 @@ output_meta <- collected_meta %>%
     ),
     # Update NDTMS denominator Definition
     `Definition of denominator` = case_when(
+      IndicatorID == 8 ~ "Number of children in reception (aged 4 to 5 years) with a valid height and weight measured by the NCMP with a BMI classified as overweight or living with obesity, including severe obesity.",
+      IndicatorID == 9 ~ "Number of children in reception (aged 10 to 11 years) with a valid height and weight measured by the NCMP with a BMI classified as overweight or living with obesity, including severe obesity.",
+      IndicatorID == 12 ~ "Total number of children whose second birthday falls within the time period who received a booster dose of Hib and MenC at any time before their second birthday.",
+      IndicatorID == 15 ~ "Completion of a CVI (certificate of visual impairment) by a consultant ophthalmologist, initiates the process of registration with a local authority and leads to access to services.",
+      IndicatorID == 20 ~ "The number of women aged 50 to 70, registered to the practice on the last day of the review period, who were invited for breast screening in the previous 12 months and who had a breast screening test result within 6 months of the invitation.",
+      IndicatorID == 44 ~ "Number of women known to smoke at time of delivery."
+      IndicatorID == 45 ~ "Number of adults aged 18 and over with a BMI classified as overwight (BMI>25kg/m²), calculated from the adjusted height and weight variables.",
       IndicatorID == 118 ~ "The number of adults in drug treatment in the local authority.",
       IndicatorID == 119 ~ "The number of adults in alcohol treatment in the local authority.",
       IndicatorID == 130 ~ "GP-registered female population aged 15-44 years.",
+      IndicatorID == 131 ~ "All children defined as having reached a good level of development at the end of the early years foundation stage (EYFS) by local authority."
       TRUE ~ `Definition of numerator`
     ),
     `Rate Type` = case_when(
