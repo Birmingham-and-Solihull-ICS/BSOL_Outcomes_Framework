@@ -21,77 +21,49 @@
 
  
   --demographic ID table
-SELECT  *
-  FROM [EAT_Reporting_BSOL].[OF].[Demographic]
-  order by DemographicLabel
+--SELECT  *
+  --FROM [EAT_Reporting_BSOL].[OF].[Demographic]
+  --order by DemographicLabel
 
 
 -- Area type aggregation ID
-select  * from EAT_Reporting_BSOL.[OF].[Aggregation]
+--select  * from EAT_Reporting_BSOL.[OF].[Aggregation]
 
 
 
---standardised rates for the indicator (output from r script)
-select *
-from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_93229_CHD_StandardisedRate]
-where IMD is not null and Ethnicity is not null 
---1345
-
---Working.[dbo].[BSOL_0033_OF_93229_CHD_StandardisedRate]
---11180
-
---Working.[dbo].[BSOL_0033_OF_93231_Stroke_StandardisedRate]
-
-
-
---organise the columns similar to indicator value table and get the Agg ID and demographic ID
+/****************************************STANDARDISED RATES***********************************************************/
+-- run this script to organise the columns similar to indicator value table and get the Agg ID and demographic ID
+--for standardised rates
 drop table if exists #sr
 select sr.IndicatorID
 		,sr.InsertDate
 		,sr.Numerator
 		,sr.Denominator
 		,sr.IndicatorValue
-		,sr.lowercl as LowerCI95 
-		,sr.uppercl as UpperCI95
+		,sr.LowerCI95 
+		,sr.UpperCI95
 		,ag.AggregationID
 		,d.DemographicID
 		,sr.DataQualityID
 		,sr.IndicatorStartDate
 		,sr.IndicatorEndDate
-		--,sr.IMD,sr.Ethnicity,sr.Gender
+		--,sr.IMD,sr.EthnicityCode,sr.Gender
 		--,d.IMD, d.Ethnicity
 		--,ag.AggregationLabel, ag.AggregationType,ag.AggregationCode
-		--,sr.AggID,sr.AggType
+		--,sr.AggregationLabel,sr.AggregationType
+		--,sr.AgeGroup,d.AgeGrp
 into #sr
-from  Working.[dbo].[BSOL_0033_OF_93229_CHD_StandardisedRate] sr
-left join EAT_Reporting_BSOL.[OF].[Aggregation] ag on (sr.AggID=ag.AggregationLabel and sr.AggType=ag.AggregationType ) or  (sr.AggID=ag.AggregationCode and sr.AggType=ag.AggregationType )
+from  Working.dbo.BSOL_0033_OF_Age_Standardised_Rates sr --Working.[dbo].[BSOL_0033_OF_93229_CHD_StandardisedRate] sr
+left join EAT_Reporting_BSOL.[OF].[Aggregation] ag on (sr.AggregationLabel=ag.AggregationLabel and sr.AggregationType=ag.AggregationType ) or  (sr.AggregationLabel=ag.AggregationCode and sr.AggregationType=ag.AggregationType )
 left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((sr.IMD=d.IMD) or (sr.IMD is null and d.IMD is null))--	and not (sr.IMD is not null and d.IMD is null)	and not (sr.IMD is null and d.IMD is not null))
-													and ((sr.Ethnicity=d.Ethnicity) or (sr.Ethnicity is null and d.Ethnicity is null))-- and not (sr.Ethnicity is not null and d.Ethnicity is null)	and not (sr.Ethnicity is null and d.Ethnicity is not null))
+													and ((sr.EthnicityCode=d.Ethnicity) or (sr.EthnicityCode is null and d.Ethnicity is null))-- and not (sr.Ethnicity is not null and d.Ethnicity is null)	and not (sr.Ethnicity is null and d.Ethnicity is not null))
 													and sr.Gender=d.Gender
-													and d.AgeGrp='All ages'
+													and d.AgeGrp=sr.AgeGroup
 
-select top 1000 * from #sr
 
-insert into #sr
-select sr2.IndicatorID
-		,sr2.InsertDate
-		,sr2.Numerator
-		,sr2.Denominator
-		,sr2.IndicatorValue
-		,sr2.lowercl as LowerCI95 
-		,sr2.uppercl as UpperCI95
-		,ag.AggregationID
-		,d.DemographicID
-		,sr2.DataQualityID
-		,sr2.IndicatorStartDate
-		,sr2.IndicatorEndDate
+--select count(*) from Working.dbo.BSOL_0033_OF_Age_Standardised_Rates  --318200
 
-from  Working.[dbo].[BSOL_0033_OF_93231_Stroke_StandardisedRate] sr2
-left join EAT_Reporting_BSOL.[OF].[Aggregation] ag on (sr2.AggID=ag.AggregationLabel and sr2.AggType=ag.AggregationType ) or  (sr2.AggID=ag.AggregationCode and sr2.AggType=ag.AggregationType )
-left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((sr2.IMD=d.IMD) or (sr2.IMD is null and d.IMD is null))--	and not (sr.IMD is not null and d.IMD is null)	and not (sr.IMD is null and d.IMD is not null))
-													and ((sr2.Ethnicity=d.Ethnicity) or (sr2.Ethnicity is null and d.Ethnicity is null))-- and not (sr.Ethnicity is not null and d.Ethnicity is null)	and not (sr.Ethnicity is null and d.Ethnicity is not null))
-													and sr2.Gender=d.Gender
-													and d.AgeGrp='All ages'
+--select count(*) from #sr
 
 
 
@@ -99,16 +71,17 @@ drop table  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
 select * 
 into EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
 from #sr
-		
----crude rates for the indicators (output from the r script)
---select * from [EAT_Reporting_BSOL].[OF].[Demographic]
---where DemographicID=1578
 
---select top 100*
---,DateDiff(year, IndicatorStartDate,IndicatorEndDate)
---from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
+select distinct IndicatorID from  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
+order by IndicatorID
+
+/**********************************************************************************************************/
 
 
+
+/*********************************************CRUDE RATES*******************************************************/
+-- run this script to organise the columns similar to indicator value table and get the Agg ID and demographic ID
+--for crude rates
 drop table if exists #cr
 select distinct 
 		cr.IndicatorID
@@ -136,16 +109,89 @@ left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((cr.IMD=d.IMD) or (cr.IM
 													and cr.Gender=d.Gender
 													and cr.AgeGroup=d.AgeGrp
 
---select top 10* from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_CrudeRate] --38340
+
+--where AggregationID is null
+--order by AggregationID
+
+--select count(*) from Working.[dbo].[BSOL_0033_OF_Crude_Rates]  --251340
+
+--select count(*) from #cr
 
 drop table if exists EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
 select * 
 into EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
 from #cr
 
-select * from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
+--select distinct IndicatorID from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
+--order by IndicatorID
 
 
+--select distinct (AgeGrp)  from [EAT_Reporting_BSOL].[OF].[Demographic]
+--order by AgeGrp
+
+/**********************************************************************************************************/
+
+
+
+/*********************************************CRUDE RATES Pre-defined denominator*******************************************************/
+-- run this script to organise the columns similar to indicator value table and get the Agg ID and demographic ID
+--for crude rates
+drop table if exists #cr_denom
+select distinct 
+		cr.IndicatorID
+		,cr.InsertDate
+		,cr.Numerator as Numerator
+		,cr.Denominator as Denominator
+		,cr.IndicatorValue
+		,cr.LowerCI95 
+		,cr.UpperCI95
+		,ag.AggregationID
+		,d.DemographicID
+		,cr.DataQualityID
+		,cr.IndicatorStartDate
+		,cr.IndicatorEndDate
+		--,cr.IMD,cr.EthnicityCode,cr.Gender
+		--,d.IMD, d.Ethnicity
+		--,ag.AggregationLabel, ag.AggregationType,ag.AggregationCode
+		--,cr.AggregationLabel,cr.AggregationType
+		--,cr.AgeGroup,d.AgeGrp
+into #cr_denom
+from  Working.[dbo].[BSOL_0033_OF_Crude_Rates_Predefined_Denominators] cr  -- dbo.BSOL_0033_OF_Crude_Rates
+left join EAT_Reporting_BSOL.[OF].[Aggregation] ag on (cr.AggregationLabel=ag.AggregationLabel and cr.AggregationType=ag.AggregationType ) or  (cr.AggregationLabel=ag.AggregationCode and cr.AggregationType=ag.AggregationType )
+left join [EAT_Reporting_BSOL].[OF].[Demographic] d on ((cr.IMD=d.IMD) or (cr.IMD is null and d.IMD is null))
+													and ((cr.EthnicityCode=d.Ethnicity) or (cr.EthnicityCode is null and d.Ethnicity is null))
+													and cr.Gender=d.Gender
+													and cr.AgeGroup=d.AgeGrp
+--where IndicatorID=20
+--where --ethnicityCode is not null
+-- AgeGroup='5-17 yrs'
+
+--select count(*) from Working.[dbo].[BSOL_0033_OF_Crude_Rates_Predefined_Denominators]  --32076
+
+--select count(*) from #cr_denom
+
+
+--select distinct IndicatorID
+--from #cr_denom
+--where DemographicID is null
+--order by IndicatorID
+
+drop table if exists  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
+select * 
+into EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
+from #cr_denom
+
+--select * 
+-- from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
+-- where IndicatorID=16
+--select distinct IndicatorID
+--from  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr_denom]
+--order by IndicatorID
+
+
+--select * from 
+--[EAT_Reporting_BSOL].[OF].[Demographic]
+--where AgeGrp='50-70 yrs'
 
 --drop table if exists EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_22401_Falls_CrudeRate]
 --select * 
@@ -162,46 +208,46 @@ select * from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
  -- select * from EAT_Reporting_BSOL.[OF].[IndicatorValue]
 ---populating the IndicatorValue table
 
-select * from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr] (IndicatorID
-		,InsertDate
-		, Numerator
-		,Denominator
-		,IndicatorValue
-		,LowerCI95 
-		,UpperCI95
-		,AggregationID
-		,DemographicID
-		,DataQualityID
-		,IndicatorStartDate
-		,IndicatorEndDate)
+--select * from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr] (IndicatorID
+--		,InsertDate
+--		, Numerator
+--		,Denominator
+--		,IndicatorValue
+--		,LowerCI95 
+--		,UpperCI95
+--		,AggregationID
+--		,DemographicID
+--		,DataQualityID
+--		,IndicatorStartDate
+--		,IndicatorEndDate)
 
-insert into EAT_Reporting_BSOL.[OF].[IndicatorValue] (IndicatorID
-		,InsertDate
-		, Numerator
-		,Denominator
-		,IndicatorValue
-		,LowerCI95 
-		,UpperCI95
-		,AggregationID
-		,DemographicID
-		,DataQualityID
-		,IndicatorStartDate
-		,IndicatorEndDate)
-select  * from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
+--insert into EAT_Reporting_BSOL.[OF].[IndicatorValue] (IndicatorID
+--		,InsertDate
+--		, Numerator
+--		,Denominator
+--		,IndicatorValue
+--		,LowerCI95 
+--		,UpperCI95
+--		,AggregationID
+--		,DemographicID
+--		,DataQualityID
+--		,IndicatorStartDate
+--		,IndicatorEndDate)
+--select  * from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]
 
-select top 10 * from EAT_Reporting_BSOL.[OF].[IndicatorValue] 
+--select top 10 * from EAT_Reporting_BSOL.[OF].[IndicatorValue] 
 
-select top 100 * from EAT_Reporting_BSOL.[OF].[IndicatorValue] 
+--select top 100 * from EAT_Reporting_BSOL.[OF].[IndicatorValue] 
 
-select distinct(IndicatorID) from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
+--select distinct(IndicatorID) from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]
 
 
-select *
-,DateDiff(year, IndicatorStartDate,IndicatorEndDate) ReportingFrequecy_y
- from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]   
- where DateDiff(year, IndicatorStartDate,IndicatorEndDate)=1
+--select *
+--,DateDiff(year, IndicatorStartDate,IndicatorEndDate) ReportingFrequecy_y
+-- from EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_cr]   
+-- where DateDiff(year, IndicatorStartDate,IndicatorEndDate)=1
 
- select* from  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]   
+-- select* from  EAT_Reporting_BSOL.[OF].[BSOL_0033_OF_sr]   
 
 
 -----------------------------------------------------------------
@@ -272,3 +318,15 @@ select *
 --  from #Group1
 --  group by Financial_Year,LSOA_2021 
 --  order by Financial_Year,LSOA_2021
+
+--SELECT	distinct IndicatorID
+ 
+--FROM	[EAT_Reporting_BSOL].[OF].[IndicatorDataPredefinedDenominator]
+--where	GP_Practice ='M88006'
+--order by IndicatorID
+
+--SELECT top 1000 * --	Distinct IndicatorID
+--FROM	[EAT_Reporting_BSOL].[OF].[IndicatorData]
+--WHERE	GP_Practice ='M88006'
+--Order by IndicatorID
+

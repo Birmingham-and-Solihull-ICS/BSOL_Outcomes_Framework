@@ -341,10 +341,10 @@ into #AllData
 from
 (
 select * from #Ethnicity
-union all
-select* from #Age
-union all
-select* from #Sex
+--union all
+--select* from #Age
+--union all
+--select* from #Sex
 )a
 
 
