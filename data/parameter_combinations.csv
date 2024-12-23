@@ -1,4 +1,36 @@
-﻿QOF indicators,
-,
-"1. Aggregate the year into 1, 3, 5",
-"2. Calculate overall crude rate at PCN, registered locality, and ICB level",
+﻿IndicatorID,ReferenceID,MinAge,MaxAge,AgeCategory,GenderCategory,StandardizedIndicator,PreDeterminedDenominator
+1,212,,,All ages,Persons,N,Y
+2,219,,,All ages,Persons,N,Y
+3,262,,,All ages,Persons,N,Y
+4,280,,,All ages,Persons,N,Y
+16,90360,,,All ages,Persons,N,Y
+20,91340,50,70,50-70 yrs,Persons,N,Y
+25,92304,18,,18+ yrs,Persons,N,Y
+35,92872,,,All ages,Persons,N,Y
+36,92873,,,All ages,Persons,N,Y
+37,92874,,,All ages,Persons,N,Y
+38,92875,,,All ages,Persons,N,Y
+42,92949,65,,65+ yrs,Persons,N,Y
+46,93113,12,17,12-17 yrs,Persons,N,Y
+58,93753,35,,35+ yrs,Persons,N,Y
+68,CV2,,,All ages,Persons,N,Y
+70,C1,,,All ages,Persons,N,Y
+74,CV8,,,All ages,Persons,N,Y
+76,CV5,18,,18+ yrs,Persons,N,Y
+77,CV9,,,All ages,Persons,N,Y
+78,CV10,,,All ages,Persons,N,Y
+85,93183,,,All ages,Persons,N,Y
+86,CV4,,,All ages,Persons,N,Y
+103,R2,,,All ages,Persons,N,Y
+105,90647,18,,18+ yrs,Persons,N,Y
+107,91215,,,All ages,Persons,N,Y
+110,253,,,All ages,Persons,N,Y
+112,30313,65,,65+ yrs,Persons,N,Y
+113,30314,65,,65+ yrs,Persons,N,Y
+116,90933,6,,6+ yrs,Persons,N,Y
+120,93386,2,3,2-3 yrs,Persons,N,Y
+121,93438,16,,16+ yrs,Persons,N,Y
+122,93476,,,All ages,Persons,N,Y
+123,93478,,,All ages,Persons,N,Y
+125,93790,6,,6+ yrs,Persons,N,Y
+127,93944,,,All ages,Persons,N,Y
