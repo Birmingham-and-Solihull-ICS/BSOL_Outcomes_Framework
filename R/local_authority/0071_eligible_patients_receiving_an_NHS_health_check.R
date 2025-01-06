@@ -424,9 +424,9 @@ ICB_HC_received <- BSol_data %>%
 # Bind aggregation levels
 HC_output <- rbind(
   PCN_HC_received %>% select(-c(AggregationCode)), 
-  locality_HC_received, 
-  LA_HC_received, 
-  ICB_HC_received
+  locality_HC_received#, 
+  #LA_HC_received, 
+  #ICB_HC_received
   )
 
 # save as csv
