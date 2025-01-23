@@ -687,7 +687,7 @@ output_meta <- collected_meta %>%
       IndicatorID == 71 ~ "There is still considerable variation between local authorities in the reported numbers of Health Checks offered and received. In some cases the variation may be the result of data quality issues.",
       IndicatorID == 111 ~ "April 2020 to March 2021 and April 2021 to March 2022 data covers the time period affected by the COVID19 pandemic and therefore data for this period should be interpreted with caution.",
       IndicatorID == 130 ~ "Solihull data currently unavailable. GP activity is assigned to the host local authority of the GP practice main base. Women, particularly younger women, may seek to use Sexual and Reproductive Health Services instead of GP services.",
-      IndicatorID %in% c(118,119) ~ "Indicator presented as the mortality rate per 1,000. This is different to FingerTips which gives the equivalenct indicator as a mortality ratio.",
+      IndicatorID %in% c(118,119) ~ "Indicator presented as the mortality rate per 1,000. This is different to FingerTips which gives the equivalent indicator as a mortality ratio.",
       IndicatorID == 131 ~ "All English providers of state-funded early years education (including academies and free schools), private, voluntary and independent (PVI) sectors are within the scope of the early years foundation stage profile (EYFSP) data collection.",
       TRUE ~ Caveats
     ),
