@@ -67,6 +67,7 @@ popfile_ward <- read.csv("data/c21_a18_e20_s2_ward.csv", header = TRUE, check.na
 #3.1 Load the indicator data from the warehouse --------------------------------
 
 # Insert which indicator IDs to extract
+
 indicator_ids <- c(10,11,13,19, 24, 26, 49, 50, 51, 59, 104, 109, 114, 115, 124, 129)
 
 # Convert the indicator IDs to a comma-separated string
@@ -457,10 +458,10 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
         ) %>%
         group_by(AggregationType, AggregationLabel, Gender, AgeGroup, IMD, EthnicityCode, FiscalYear, DataQualityID) %>%
         left_join(standard_pop, by = c("AgeB18CategoriesCode"="AgeBandCode")) %>% 
-        phe_dsr(x=Numerator,
+        calculate_dsr2(x=Numerator,
                 n=Denominator,
                 stdpop= Population,
-                stdpoptype = "field",
+                # stdpoptype = "field", # commented this out to handle NULL outputs when the numerator is significantly smaller than the denominator
                 type = "standard",
                 multiplier = multiplier) %>%
         rename(
