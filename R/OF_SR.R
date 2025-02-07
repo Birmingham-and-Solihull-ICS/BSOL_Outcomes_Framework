@@ -732,14 +732,29 @@ sql_connection <- dbConnect(
   Trusted_Connection = "True"
 )
 
-# Overwrite the existing table
-dbWriteTable(
-  sql_connection,
-  Id(schema = "dbo", table = "BSOL_0033_OF_Age_Standardised_Rates"),
-  results, # Processed dataset
-  # append = TRUE # Append the data to the existing table
-  overwrite = TRUE
-)
+
+dbWriteTable(sql_connection, "BSOL_0033_OF_Age_Standardised_Rates", results, overwrite = TRUE, field.types = list(
+  IndicatorID = "INT",
+  InsertDate = "DATE",
+  Numerator = "NUMERIC(18,6)",
+  Denominator = "NUMERIC(18,6)",
+  IndicatorValue = "NUMERIC(18,6)",
+  IndicatorValueType = "VARCHAR(255)",
+  LowerCI95 = "NUMERIC(18,6)",
+  UpperCI95 = "NUMERIC(18,6)",
+  AggregationType = "VARCHAR(255)",
+  AggregationLabel = "VARCHAR(255)",
+  FiscalYear = "VARCHAR(255)",
+  Gender = "VARCHAR(255)",
+  AgeGroup = "VARCHAR(255)",
+  IMD = "VARCHAR(255)",
+  EthnicityCode = "VARCHAR(255)",
+  StatusID = "INT",
+  DataQualityID = "INT",
+  IndicatorStartDate = "DATE",
+  IndicatorEndDate = "DATE"
+))
+
 
 # End the timer
 end_time <- Sys.time()
