@@ -67,6 +67,7 @@ popfile_ward <- read.csv("data/c21_a18_e20_s2_ward.csv", header = TRUE, check.na
 #3.1 Load the indicator data from the warehouse --------------------------------
 
 # Insert which indicator IDs to extract
+
 indicator_ids <- c(10,11,13,19, 24, 26, 49, 50, 51, 59, 104, 109, 114, 115, 124, 129)
 
 # Convert the indicator IDs to a comma-separated string
@@ -457,10 +458,10 @@ calculate_age_std_rate <- function(indicator_id, denominator_data, numerator_dat
         ) %>%
         group_by(AggregationType, AggregationLabel, Gender, AgeGroup, IMD, EthnicityCode, FiscalYear, DataQualityID) %>%
         left_join(standard_pop, by = c("AgeB18CategoriesCode"="AgeBandCode")) %>% 
-        phe_dsr(x=Numerator,
+        calculate_dsr2(x=Numerator,
                 n=Denominator,
                 stdpop= Population,
-                stdpoptype = "field",
+                # stdpoptype = "field", # commented this out to handle NULL outputs when the numerator is significantly smaller than the denominator
                 type = "standard",
                 multiplier = multiplier) %>%
         rename(
@@ -731,14 +732,29 @@ sql_connection <- dbConnect(
   Trusted_Connection = "True"
 )
 
-# Overwrite the existing table
-dbWriteTable(
-  sql_connection,
-  Id(schema = "dbo", table = "BSOL_0033_OF_Age_Standardised_Rates"),
-  results, # Processed dataset
-  # append = TRUE # Append the data to the existing table
-  overwrite = TRUE
-)
+
+dbWriteTable(sql_connection, "BSOL_0033_OF_Age_Standardised_Rates", results, overwrite = TRUE, field.types = list(
+  IndicatorID = "INT",
+  InsertDate = "DATE",
+  Numerator = "NUMERIC(18,6)",
+  Denominator = "NUMERIC(18,6)",
+  IndicatorValue = "NUMERIC(18,6)",
+  IndicatorValueType = "VARCHAR(255)",
+  LowerCI95 = "NUMERIC(18,6)",
+  UpperCI95 = "NUMERIC(18,6)",
+  AggregationType = "VARCHAR(255)",
+  AggregationLabel = "VARCHAR(255)",
+  FiscalYear = "VARCHAR(255)",
+  Gender = "VARCHAR(255)",
+  AgeGroup = "VARCHAR(255)",
+  IMD = "VARCHAR(255)",
+  EthnicityCode = "VARCHAR(255)",
+  StatusID = "INT",
+  DataQualityID = "INT",
+  IndicatorStartDate = "DATE",
+  IndicatorEndDate = "DATE"
+))
+
 
 # End the timer
 end_time <- Sys.time()
